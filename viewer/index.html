@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>bibwatch viewer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <strong>bibwatch</strong>
+    <label class="file" id="libraryWrap" hidden>Library <select id="library"><option value="">Choose a video…</option></select></label>
+    <label class="file">Video <input id="videoFile" type="file" accept="video/*"></label>
+    <label class="file">Detections / segments JSON <input id="dataFile" type="file" accept=".json,application/json"></label>
+    <span id="status" class="muted">Drop a video and its detections.json (or segments.json) anywhere. Files stay on this computer.</span>
+  </header>
+
+  <main>
+    <section id="stage">
+      <div id="player">
+        <video id="video" playsinline></video>
+        <canvas id="overlay"></canvas>
+      </div>
+      <div id="scrubber">
+        <span id="elapsed">00:00:00</span>
+        <div id="timeline">
+          <div id="track">
+            <div id="layers"></div>
+            <div id="played"></div>
+          </div>
+          <div id="knob"></div>
+          <div id="hoverTime" hidden></div>
+        </div>
+        <span id="remaining">-00:00:00</span>
+      </div>
+      <div id="scanProgress" hidden>
+        <div id="scanTrack"><div id="scanFill"></div></div>
+        <span id="scanText"></span>
+      </div>
+      <div id="controls">
+        <button id="play">▶︎ Play</button>
+        <button id="back1" title="Shift+←">−1s</button>
+        <button id="back" title="←">−0.1s</button>
+        <button id="fwd" title="→">+0.1s</button>
+        <button id="fwd1" title="Shift+→">+1s</button>
+        <select id="rate" title="Playback speed">
+          <option value="0.25">0.25×</option><option value="0.5">0.5×</option>
+          <option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option>
+        </select>
+        <span class="sep"></span>
+        <button id="runScan" title="Read bibs in this video on this Mac (only frames not read before)">Run scan</button>
+        <button id="resync" title="R — re-decide crossings with the current mats and camera segments">Re-sync</button>
+        <button id="clearScans" title="Delete the saved scan of this video">Clear scans…</button>
+        <span class="sep"></span>
+        <button id="setClock" title="Pause on a known crossing and enter its reader time">Set clock…</button>
+        <button id="markMat" title="M — click the two ends of the mat's near edge">Mark mat</button>
+        <button id="toggleKind" title="C — from the playhead on, flip between camera still and camera moving">Camera still / moving</button>
+        <button id="splitSegment" title="S — start a new camera segment at the playhead (e.g. after the camera was bumped)">Split here</button>
+        <button id="exportSegments">Export segments.json</button>
+        <span class="sep"></span>
+        <label class="toggle" title="How far a trackpad / Magic Mouse swipe moves the video (hold ⌥ Option for 10× faster)">
+          Swipe speed <input id="swipeSpeed" type="range" min="0" max="100" step="1" value="35">
+          <span id="swipeSpeedLabel" class="speedLabel"></span>
+        </label>
+        <label class="toggle" title="Flip which way a swipe moves the video"><input id="swipeReverse" type="checkbox"> reverse</label>
+        <span class="sep"></span>
+        <label class="toggle"><input id="showPeople" type="checkbox" checked> people</label>
+        <label class="toggle"><input id="showAll" type="checkbox" checked> all bibs</label>
+      </div>
+    </section>
+
+    <aside id="side">
+      <div id="clockPanel">
+        <div><span class="muted">Video</span> <span id="videoTime">00:00:00.0</span></div>
+        <div><span class="muted">Reader</span> <span id="readerTime">—</span></div>
+        <div id="segmentInfo" class="muted"></div>
+      </div>
+      <details id="templatesPanel" hidden>
+        <summary>Bib templates <span id="tplSummary" class="muted"></span></summary>
+        <p class="muted small">Scans with templates only read numbers on these bib designs — faster, far less noise.
+          Tick the designs used at this event.</p>
+        <ul id="tplList"></ul>
+        <div class="tplActions">
+          <label class="btn">+ From design image<input id="tplImage" type="file" accept="image/png,image/jpeg,image/webp" hidden></label>
+          <button id="tplFromVideo" title="Then click the number of a clear bib in the video">+ From a bib in the video</button>
+        </div>
+        <label class="toggle"><input id="showFinder" type="checkbox"> Show what the templates find (when paused)</label>
+      </details>
+      <div id="filters">
+        <button data-filter="all" class="active">All</button>
+        <button data-filter="crossed">Crossed</button>
+        <button data-filter="targets">Targets</button>
+        <button data-filter="other">Not crossed</button>
+      </div>
+      <div id="listTools">
+        <input id="search" type="search" placeholder="Find bib…">
+        <select id="tagFilter" title="Show only sightings with this tag"><option value="">Any tag</option></select>
+        <button id="exportCsv" title="Download every sighting with its tags as a CSV">CSV</button>
+      </div>
+      <div id="tagBar" hidden>
+        <div class="muted" id="tagTitle"></div>
+        <div id="tagButtons"></div>
+        <input id="customTag" type="text" placeholder="Add a tag… (Enter)">
+      </div>
+      <ol id="list"></ol>
+    </aside>
+  </main>
+
+  <dialog id="clearDialog">
+    <form method="dialog">
+      <h3>Clear scans for <span id="clearVideo"></span>?</h3>
+      <p>This deletes the bibs and people read from this video and the crossings found.
+        The next <b>Run scan</b> reads the whole video again (<span id="clearEstimate">a while</span>).</p>
+      <p class="muted">Your marked mats and camera fixes can be kept.</p>
+      <div class="actions">
+        <button value="cancel" autofocus>Cancel</button>
+        <button value="keep">Clear scan results, keep my mats</button>
+        <button value="all" class="danger">Clear everything</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- In-page questions: the built-in browser (and some others) block prompt()/confirm()/alert(). -->
+  <dialog id="uiDialog">
+    <form method="dialog">
+      <p id="uiMessage"></p>
+      <input id="uiInput" type="text" autocomplete="off" hidden>
+      <div class="actions">
+        <button value="cancel" id="uiCancel">Cancel</button>
+        <button value="ok" id="uiOk" class="primary">OK</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+.build/
+.swiftpm/
+out/
+*.mp4
+*.MP4
+*.mov
+*.jpg
+*.png
+.DS_Store
+__pycache__/
+*.pyc
