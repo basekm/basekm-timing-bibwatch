@@ -75,10 +75,16 @@ const uiPrompt = (message, value = '') => uiAsk({ message, input: value });
 function loadVideo(src, name) {
   state.videoName = name;
   state.mediaVideo = src.startsWith('/media/') ? decodeURIComponent(src.slice('/media/'.length)) : null;
+  state.clockOffset = null; // each video has its own clock
   video.src = src;
   updateScanUI();
+  const onServer = state.mediaVideo ? state.server?.clocks?.[state.mediaVideo] : null;
   const saved = localStorage.getItem(`bibwatch.clock.${name}`);
-  if (saved != null) state.clockOffset = Number(saved);
+  if (onServer != null) state.clockOffset = onServer;
+  else if (saved != null) {
+    state.clockOffset = Number(saved);
+    saveClock(); // set before the clock moved to the server: keep it there from now on
+  }
   setStatus(`Video: ${name}` + (state.data ? ` · ${state.data.video || ''}` : ''));
 }
 
@@ -211,7 +217,7 @@ function evaluate(w, pad, fineFps) {
   const trend = avg(feet.slice(-q)) - avg(feet.slice(0, q));
   s.direction = trend > 0.03 ? 'toward' : trend < -0.03 ? 'away' : 'still';
 
-  if (!mat) { s.label = 'viewed'; s.note = 'no mat marked for this camera position'; return s; }
+  if (!mat) { s.label = 'viewed'; s.note = 'no mat for this camera position'; return s; }
   const track = keys.map((k) => {
     const b = person.get(k).box;
     return { t: frames[k].t, x: cxOf(b), depth: b[3] - matY(mat, cxOf(b)) };
@@ -274,12 +280,33 @@ function resync(announce = true) {
   state.crossedBibs = new Set(state.sightings.filter((s) => s.label === 'crossed').map((s) => s.bib));
   state.needsScan = state.sightings.filter((s) => s.label === 'needs-scan').length;
   renderList(); renderTimeline(); updateScanUI(); refreshTagFilter(); renderTagBar();
+  saveSightingsSoon();
   if (announce) {
     const crossed = state.sightings.filter((s) => s.label === 'crossed').length;
     setStatus(`Re-synced: ${state.sightings.length} sightings, ${crossed} crossed` +
       (state.needsScan ? ` · ${state.needsScan} need frames that haven't been read yet — press Run scan` : ''));
   }
   return state.needsScan;
+}
+
+// The server keeps the sightings as last decided here (current mats and segments), so a
+// search across videos finds what you see. Saved shortly after the last re-sync.
+let sightingsTimer = null;
+function saveSightingsSoon() {
+  if (!state.server || !state.mediaVideo) return;
+  const name = state.mediaVideo;
+  clearTimeout(sightingsTimer);
+  sightingsTimer = setTimeout(async () => {
+    if (name !== state.mediaVideo) return; // another video was opened meanwhile
+    const sightings = state.sightings.map((s) => ({
+      bib: s.bib, from: s.from, to: s.to, cross: s.cross ?? null, label: s.label, zone: s.zone ?? null,
+      direction: s.direction ?? null, template: s.template ?? null, target: Boolean(s.target),
+      registered: typeof s.registered === 'boolean' ? s.registered : null, reads: s.reads ?? 0, note: s.note || '',
+    }));
+    try {
+      await api('/api/sightings', { video: name, duration: state.data?.duration || video.duration || null, sightings });
+    } catch (e) { setStatus(`⚠️ Could not save sightings for search: ${e.message}`); }
+  }, 800);
 }
 
 // ---------- geometry: where the picture actually sits inside the <video> box ----------
@@ -359,8 +386,8 @@ function draw() {
   // Running clock and segment state.
   const clockText = `▶ ${fmt(t)}` + (reader(t) != null ? `   reader ${fmt(reader(t))}` : '   reader: set clock');
   tag(clockText, r.x + 10, r.y + 30, 'rgba(0,0,0,0.7)', 18);
+  // No banner for a position without a mat: the mat is optional (bibs there are tagged 001 Viewed).
   if (seg && seg.kind === 'moving') banner('CAMERA MOVING — crossings not counted', r.x + r.w / 2, r.y + 60, '#ff9f0a');
-  else if (seg && !seg.mat) banner('Mat not marked for this camera position — press M', r.x + r.w / 2, r.y + 60, '#9aa0a6');
 
   // What the templates find in this (paused) frame.
   if ($('showFinder').checked && state.finder && Math.abs(state.finder.t - t) < 0.05) {
@@ -410,7 +437,7 @@ let lastListKey = '';
 function updateSide(t, seg) {
   $('videoTime').textContent = fmt(t);
   $('readerTime').textContent = reader(t) != null ? fmt(reader(t)) : 'set clock';
-  $('segmentInfo').textContent = seg ? `Segment #${seg.index} · ${seg.kind}${seg.kind === 'fixed' ? (seg.mat ? ' · mat marked' : ' · mat not marked') : ''} · ${fmt(seg.from, false)}–${fmt(seg.to, false)}` : '';
+  $('segmentInfo').textContent = seg ? `Segment #${seg.index} · ${seg.kind}${seg.kind === 'fixed' ? (seg.mat ? ' · mat marked' : '') : ''} · ${fmt(seg.from, false)}–${fmt(seg.to, false)}` : '';
   // Highlight sightings around the current time.
   const key = Math.floor(t * 2);
   if (key === lastListKey) return;
@@ -679,8 +706,19 @@ $('setClock').addEventListener('click', async () => {
   if (secs == null) { uiAlert('Could not read that time — use HH:MM:SS or HH:MM:SS.s'); return; }
   state.clockOffset = secs - video.currentTime;
   if (state.videoName) localStorage.setItem(`bibwatch.clock.${state.videoName}`, String(state.clockOffset));
+  saveClock();
   renderList(); draw();
 });
+
+// The clock is saved on the server too: search across videos shows reader times with it.
+async function saveClock() {
+  if (!state.server || !state.mediaVideo || state.clockOffset == null) return;
+  const name = state.mediaVideo, clockOffset = state.clockOffset;
+  try {
+    await api('/api/media/clock', { video: name, clockOffset });
+    (state.server.clocks ||= {})[name] = clockOffset;
+  } catch (e) { setStatus(`⚠️ Could not save the clock: ${e.message}`); }
+}
 
 $('markMat').addEventListener('click', toggleMarking);
 
@@ -797,7 +835,7 @@ $('exportSegments').addEventListener('click', () => {
   a.download = `segments_${(out.video || 'video').replace(/\.[^.]+$/, '')}.json`;
   a.click();
   const unmarked = state.segments.filter((s) => s.kind === 'fixed' && !s.mat).length;
-  setStatus(unmarked ? `Exported — ${unmarked} fixed segment(s) still have no mat (no crossings will be counted there)` : 'Exported segments.json');
+  setStatus(unmarked ? `Exported segments.json · ${unmarked} camera position(s) without a mat: bibs there are tagged 001 Viewed` : 'Exported segments.json');
 });
 
 document.addEventListener('keydown', (e) => {
@@ -850,6 +888,7 @@ async function probeServer() {
   if (state.server) {
     $('libraryWrap').hidden = false;
     loadTemplates();
+    $('searchAllPanel').hidden = false;
     for (const v of state.server.videos) {
       const o = document.createElement('option'); o.value = v; o.textContent = v + (state.server.scans[v.replace(/\.[^.]+$/, '')]?.detections ? '  ✓ scanned' : '');
       lib.appendChild(o);
@@ -861,9 +900,11 @@ async function probeServer() {
   updateScanUI();
 }
 
-$('library').addEventListener('change', async (e) => {
-  const name = e.target.value;
+$('library').addEventListener('change', (e) => openLibraryVideo(e.target.value));
+
+async function openLibraryVideo(name) {
   if (!name) return;
+  $('library').value = name;
   loadVideo(`/media/${encodeURIComponent(name)}`, name);
   const scan = state.server?.scans[name.replace(/\.[^.]+$/, '')];
   const data = scan?.detections || scan?.segments;
@@ -883,7 +924,7 @@ $('library').addEventListener('change', async (e) => {
     }
   } else { state.data = null; state.frames = []; state.segments = []; state.sightings = []; renderList(); renderTimeline(); setStatus(`${name} · not scanned yet — press Run scan`); }
   await loadTags(scan?.tags);
-});
+}
 
 function updateScanUI() {
   const btn = $('runScan');
@@ -911,9 +952,6 @@ $('runScan').addEventListener('click', async () => {
   };
   try {
     await api('/api/scan', body); followScan();
-    // The mat is optional: without one, bibs in that camera position are tagged 001 Viewed.
-    const noMat = state.segments.filter((s) => s.kind === 'fixed' && !s.mat).length;
-    if (noMat) setStatus(`Scanning… ${noMat} camera position(s) have no mat marked — bibs there are tagged 001 Viewed (mark a mat any time to get 000 Crossed the mat).`);
   } catch (e) { uiAlert(`Could not start the scan: ${e.message}`); }
 });
 
@@ -1043,11 +1081,11 @@ probeServer();
 
 // ---------- tags ----------
 // Automatic: zone (background / before-mat / on-mat / past-mat) and direction (toward / away /
-// still), decided with the crossings. Yours: anything you add to a sighting, saved per video in
-// <media>/scans/<video>/tags.json as you make them.
+// still), decided with the crossings. Yours: anything you add to a sighting, saved per video on
+// the server (its database) as you make them.
 // Numbered tags. Automatic ones come from the crossing decision (mirror of tagCode in Scan.swift);
 // yours start at 100 — presets 100–103 (keys 1–4), anything you type gets the next free code,
-// remembered per video (stored in tags.json under "__codes").
+// remembered per video (sent with the tags under "__codes").
 const AUTO_TAGS = {
   crossed: ['000', 'Crossed the mat'], viewed: ['001', 'Viewed'], 'near-mat': ['002', 'Near the mat'],
   passing: ['003', 'Passing'], 'camera-moving': ['004', 'Camera moving'], duplicate: ['005', 'Duplicate'],
@@ -1141,7 +1179,7 @@ function saveTagsSoon() {
       await api('/api/tags', { video: state.mediaVideo, tags: state.tags });
       tagTimer = null;
       const stem = state.mediaVideo.replace(/\.[^.]+$/, '');
-      state.server.scans[stem] = { ...(state.server.scans[stem] || {}), tags: `/media/scans/${stem}/tags.json` };
+      state.server.scans[stem] = { ...(state.server.scans[stem] || {}), tags: `/api/tags?video=${encodeURIComponent(state.mediaVideo)}` };
     } catch (e) {
       tagTimer = null;
       setStatus(`⚠️ Could not save tags: ${e.message}`);
@@ -1327,3 +1365,36 @@ function loop() {
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
+
+// ---------- search across videos ----------
+// Every video in the media folder, from the server's database: where was this bib seen?
+// Sorted by reader time (videos with a clock set), so the same runner across cameras lines up.
+let searchAllTimer = null;
+$('searchAll').addEventListener('input', () => {
+  clearTimeout(searchAllTimer);
+  searchAllTimer = setTimeout(runSearchAll, 250);
+});
+
+async function runSearchAll() {
+  const q = $('searchAll').value.trim();
+  const list = $('searchAllResults');
+  if (!q) { list.innerHTML = ''; $('searchAllSummary').textContent = ''; return; }
+  const param = /^\d+$/.test(q) ? `bib=${encodeURIComponent(q)}` : `tag=${encodeURIComponent(q)}`;
+  let found;
+  try { found = (await api(`/api/sightings?${param}`)).sightings; } catch (e) { $('searchAllSummary').textContent = e.message; return; }
+  if ($('searchAll').value.trim() !== q) return; // typed on meanwhile
+  const videos = new Set(found.map((s) => s.video)).size;
+  $('searchAllSummary').textContent = found.length ? `${found.length} sighting(s) in ${videos} video(s)` : 'not seen in any video';
+  list.innerHTML = found.slice(0, 200).map((s, i) => `<li data-i="${i}" class="${s.label === 'crossed' ? 'crossed' : ''}">
+      <span class="bib">${escapeHtml(s.bib)}</span>
+      <span>${escapeHtml(s.autoTag)}${s.tags.length ? ' · ' + s.tags.map(escapeHtml).join(', ') : ''}</span>
+      <span class="muted">${escapeHtml(s.video)} ${fmt(s.at)}${s.readerTime != null ? ' · reader ' + fmt(s.readerTime) : ''}</span>
+    </li>`).join('');
+  list.querySelectorAll('li').forEach((li) => li.addEventListener('click', () => openSighting(found[li.dataset.i])));
+}
+
+async function openSighting(s) {
+  if (s.video !== state.mediaVideo) await openLibraryVideo(s.video);
+  const seek = () => { video.pause(); video.currentTime = Math.max(0, s.at - 1); selectSighting(s.key); };
+  if (video.readyState >= 1) seek(); else video.addEventListener('loadedmetadata', seek, { once: true });
+}

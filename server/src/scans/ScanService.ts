@@ -7,11 +7,12 @@ import { ScanStateId } from '../@shared/constants/ScanStateId';
 import { ScanClearRequestDto } from '../@shared/dto/ScanClearRequestDto';
 import { ScanStartRequestDto } from '../@shared/dto/ScanStartRequestDto';
 import { SegmentsSaveRequestDto } from '../@shared/dto/SegmentsSaveRequestDto';
-import { TagsSaveRequestDto } from '../@shared/dto/TagsSaveRequestDto';
 import { pathExists } from '../@shared/lib/pathExists';
 import { writeJsonAtomic } from '../@shared/lib/writeJsonAtomic';
 import { BibwatchService } from '../bibwatch/BibwatchService';
 import { MediaService } from '../media/MediaService';
+import { SightingImportService } from '../sightings/SightingImportService';
+import { SightingService } from '../sightings/SightingService';
 import { TemplateService } from '../templates/TemplateService';
 
 import { ScanJob } from './ScanJob';
@@ -25,6 +26,8 @@ export class ScanService {
     private readonly bibwatchService: BibwatchService,
     private readonly mediaService: MediaService,
     private readonly templateService: TemplateService,
+    private readonly sightingService: SightingService,
+    private readonly sightingImportService: SightingImportService,
   ) {}
 
   async getStatus() {
@@ -63,7 +66,8 @@ export class ScanService {
     }
 
     // Not awaited: the scan runs in the background and the viewer polls getStatus().
-    void job.run({
+    // When it ends (done, failed or cancelled), what it saved goes into the database for search.
+    const run = job.run({
       videoPath,
       segments: body.segments ?? null,
       clock: body.clock ?? null,
@@ -72,6 +76,7 @@ export class ScanService {
       templatePaths,
       startAt: body.from ?? null,
     });
+    void run.then(() => this.sightingImportService.importDetections(body.video)).catch(() => undefined);
 
     return job.getStatus();
   }
@@ -106,22 +111,16 @@ export class ScanService {
         removed.push(name);
       }
     }
+    if (removed.includes('detections.json')) {
+      await this.sightingService.deleteForVideo(body.video);
+    }
+
     const left = await fs.readdir(folder).catch(() => null);
     if (left && left.length === 0) {
       await fs.rmdir(folder);
     }
 
     return { removed };
-  }
-
-  /** Your own tags on sightings (finisher, spectator, …), saved as you make them. */
-  async saveTags(body: TagsSaveRequestDto) {
-    await this.mediaService.resolveVideo(body.video);
-    const folder = this.mediaService.scanFolderOf(body.video);
-    await fs.mkdir(folder, { recursive: true });
-    await writeJsonAtomic(path.join(folder, 'tags.json'), body.tags);
-
-    return { saved: true };
   }
 
   /** Mats and camera-segment edits from the viewer, saved as the user makes them. */

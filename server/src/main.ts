@@ -1,8 +1,8 @@
-import { BadRequestException, ValidationPipe } from '@nestjs/common';
+import { BadRequestException, ValidationError, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 
-import { Response } from 'express';
+import { NextFunction, Request, Response } from 'express';
 
 import { AppModule } from './app.module';
 import { ConfigService } from './config/ConfigService';
@@ -12,6 +12,14 @@ const noStore = (res: Response) => res.setHeader('Cache-Control', 'no-store');
 
 // Passed through to fs.createReadStream: 1 MB reads instead of 64 KB roughly doubles throughput on big videos.
 const videoReadOptions = { highWaterMark: 1024 * 1024 };
+
+// Nested DTOs (e.g. each sighting) report their problems under `children`.
+const messagesOf = (errors: ValidationError[], parent = ''): string[] =>
+  errors.flatMap((error) => {
+    const at = parent ? `${parent}.${error.property}` : error.property;
+    const own = Object.values(error.constraints ?? {}).map((message) => (parent ? `${at}: ${message}` : message));
+    return [...own, ...messagesOf(error.children ?? [], at)];
+  });
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -35,9 +43,14 @@ async function bootstrap() {
       transform: true,
       exceptionFactory: (errors) =>
         new BadRequestException({
-          error: errors.flatMap((e) => Object.values(e.constraints ?? {})).join('; '),
+          error: messagesOf(errors).join('; '),
         }),
     }),
+  );
+
+  // The database lives in the media folder by default; it is read through the API, never served as a file.
+  app.use('/media', (req: Request, res: Response, next: NextFunction) =>
+    /\.sqlite(-wal|-shm|-journal)?$/i.test(req.path) ? res.sendStatus(404) : next(),
   );
 
   // Videos, scans and templates. express.static streams files and answers Range requests, so video

@@ -42,6 +42,19 @@ Or put `MEDIA_FOLDER` (and `PORT`) in `server/.env.development` / `.env.producti
 Reads accumulate per video in `media/scans/<video>/detections.json` (with the segments you
 sent in `segments.json`). Cancelling a scan discards that run's new reads.
 
+## Search all videos
+
+**Search all videos** (side panel) finds a bib, or a tag, in every video of the media folder:
+type `147` (finds 0147) or `finisher`; click a result to open that video at that moment.
+Results are sorted by reader time, so set the clock (**Set clock…**) on each video to line up
+the same runner across cameras. API: `GET /api/sightings?bib=147` or `?tag=finisher`.
+
+This comes from the server's SQLite database, `<media>/bibwatch.sqlite` (or
+`DATABASE_SQLITE_FILE`): the sightings of every video as last decided (a finished scan, or a
+re-sync in the viewer), your tags and each video's clock. `detections.json` stays the scanner's
+output; on start the server reads in any that are newer than what it has, and any `tags.json`
+from before tags moved into the database.
+
 ## Bib templates (less noise, faster)
 
 A template is one bib design, **measured — not trained**: band colour, digit colour, digit
@@ -82,7 +95,7 @@ Plus detail on each sighting: **zone** (background / before-mat / on-mat / past-
 Your own tags start at **100**: select a sighting (in the list, or click its box on the video)
 and press **1–4** — 100 finisher, 101 photo, 102 misread, 103 wrong bib — or type any tag;
 it gets the next free code (104, 105 …), remembered per video. Tags save per video
-(`scans/<video>/tags.json`); filter the list by any tag; **CSV** exports every sighting with
+(in the database, see *Search all videos*); filter the list by any tag; **CSV** exports every sighting with
 `tag_code`, `tag`, your tags and the detail.
 
 ## Workflow (command line)
@@ -97,15 +110,16 @@ Splits the video wherever the camera was moved (or handled), and ignores people 
 past the lens. Output: `fixed` segments (camera still) and `moving` segments (no crossings
 are counted there).
 
-### 2. Mark the mat for each fixed segment (viewer)
+### 2. Mark the mat (viewer, optional)
 
-Open the viewer (see below) with the video and `segments_*.json`. For each **fixed**
-segment (green on the timeline, grey = not marked yet):
+Without a mat, bibs in that camera position are tagged **001 Viewed**; with one, the scan also
+decides who **crossed** it. Open the viewer (see below) with the video and `segments_*.json`.
+For each **fixed** segment where the mat is visible (green on the timeline, grey = no mat):
 
 1. Go to a moment where the mat is visible.
 2. Press **M** (or *Mark mat*) and click the two ends of the **near edge of the black mat**
    (the edge runners step onto first). It can be slanted.
-3. When every fixed segment is marked, click **Export segments.json**.
+3. Click **Export segments.json**.
 
 The automatic split can be off by a few seconds, or miss a move. Correct it in the viewer:
 
@@ -121,8 +135,8 @@ Edits are kept in the exported `segments.json`; re-run `scan` with it.
 ### 3. Set the clock (optional but recommended)
 
 GoPro clocks are unreliable. Pause on a known finisher crossing the mat, click
-**Set clock…** and enter that runner's reader time (e.g. `05:57:58`). The viewer remembers
-it per video. Use the same value for `--clock` in step 4 = reader time at video 0:00
+**Set clock…** and enter that runner's reader time (e.g. `05:57:58`). The server saves
+it per video (search uses it too). Use the same value for `--clock` in step 4 = reader time at video 0:00
 (the viewer shows it: reader time − video time).
 
 ### 4. Scan

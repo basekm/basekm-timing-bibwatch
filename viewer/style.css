@@ -147,3 +147,14 @@ dialog#uiDialog button.primary { background: var(--accent); border-color: var(--
 #layers .reading { position: absolute; top: -2px; bottom: -2px; width: 3px; margin-left: -1px; background: var(--accent); box-shadow: 0 0 6px var(--accent); }
 
 #list .chip.unregistered { background: rgba(255, 159, 10, 0.25); color: var(--text); }
+
+/* Search all videos (the server's database) */
+#searchAllPanel { margin: 8px 10px 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; }
+#searchAllPanel[hidden] { display: none; }
+#searchAllPanel summary { cursor: pointer; font-weight: 600; }
+#searchAll { width: 100%; box-sizing: border-box; margin: 8px 0 4px; padding: 5px 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; }
+#searchAllResults { list-style: none; margin: 0; padding: 0; max-height: 240px; overflow-y: auto; }
+#searchAllResults li { display: grid; grid-template-columns: 44px 1fr; gap: 0 8px; padding: 5px 6px; border-radius: 4px; cursor: pointer; font-size: 12px; font-variant-numeric: tabular-nums; }
+#searchAllResults li:hover { background: rgba(255, 255, 255, 0.05); }
+#searchAllResults li .bib { font-weight: 700; grid-row: span 2; font-size: 13px; }
+#searchAllResults li.crossed .bib { color: var(--cross); }

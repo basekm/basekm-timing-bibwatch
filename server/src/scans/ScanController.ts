@@ -3,7 +3,6 @@ import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
 import { ScanClearRequestDto } from '../@shared/dto/ScanClearRequestDto';
 import { ScanStartRequestDto } from '../@shared/dto/ScanStartRequestDto';
 import { SegmentsSaveRequestDto } from '../@shared/dto/SegmentsSaveRequestDto';
-import { TagsSaveRequestDto } from '../@shared/dto/TagsSaveRequestDto';
 
 import { ScanService } from './ScanService';
 
@@ -32,12 +31,6 @@ export class ScanController {
   @HttpCode(200)
   async clear(@Body() body: ScanClearRequestDto) {
     return this.scanService.clear(body);
-  }
-
-  @Post('tags')
-  @HttpCode(200)
-  async saveTags(@Body() body: TagsSaveRequestDto) {
-    return this.scanService.saveTags(body);
   }
 
   @Post('segments')

@@ -32,6 +32,15 @@ export class ConfigService {
     return folder ? path.resolve(folder) : null;
   }
 
+  /** Defaults to <media>/bibwatch.sqlite: the sightings and tags travel with the videos they describe. */
+  get DatabaseSQLiteFile() {
+    const file = this.nestConfigService.get<string>('DATABASE_SQLITE_FILE');
+    if (file) {
+      return path.resolve(file);
+    }
+    return this.MediaFolder ? path.join(this.MediaFolder, 'bibwatch.sqlite') : null;
+  }
+
   get RepoFolder() {
     return REPO_FOLDER;
   }

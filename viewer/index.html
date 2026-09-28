@@ -86,6 +86,11 @@
         </div>
         <label class="toggle"><input id="showFinder" type="checkbox"> Show what the templates find (when paused)</label>
       </details>
+      <details id="searchAllPanel" hidden>
+        <summary>Search all videos <span id="searchAllSummary" class="muted"></span></summary>
+        <input id="searchAll" type="search" placeholder="Bib number, or a tag (e.g. finisher)…">
+        <ol id="searchAllResults"></ol>
+      </details>
       <div id="filters">
         <button data-filter="all" class="active">All</button>
         <button data-filter="crossed">Crossed</button>

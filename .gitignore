@@ -7,3 +7,6 @@ out/
 *.jpg
 *.png
 .DS_Store
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal

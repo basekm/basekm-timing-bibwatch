@@ -156,7 +156,7 @@ func evaluate(_ w: Window, frames allFrames: [OverlayFrame], pad: Double, fineFp
   let trend = feet.suffix(quarter).reduce(0, +) / Double(quarter) - feet.prefix(quarter).reduce(0, +) / Double(quarter)
   s.direction = trend > 0.03 ? "toward" : trend < -0.03 ? "away" : "still"
 
-  guard let mat = w.seg.mat else { s.label = "viewed"; s.note = "no mat marked for this camera position"; return s }
+  guard let mat = w.seg.mat else { s.label = "viewed"; s.note = "no mat for this camera position"; return s }
   let track = keys.map { (t: frames[$0].t, x: person[$0]!.box.cx, depth: mat.depth(person[$0]!.box.cx, person[$0]!.box.y1)) }
   // Zone: typical position while the bib was readable.
   let readDepths = keys.filter { person[$0]!.read }.map { mat.depth(person[$0]!.box.cx, person[$0]!.box.y1) }.sorted()

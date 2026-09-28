@@ -6,6 +6,7 @@ import * as path from 'path';
 import { isDirectory, isFile, pathExists } from '../@shared/lib/pathExists';
 import { BibwatchService } from '../bibwatch/BibwatchService';
 import { ConfigService } from '../config/ConfigService';
+import { VideoService } from '../videos/VideoService';
 
 const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.m4v'];
 
@@ -14,6 +15,7 @@ export class MediaService {
   constructor(
     private readonly configService: ConfigService,
     private readonly bibwatchService: BibwatchService,
+    private readonly videoService: VideoService,
   ) {}
 
   get folder() {
@@ -47,8 +49,16 @@ export class MediaService {
     return `/media/scans/${videoStem(video)}`;
   }
 
+  /** Video files at the top of the media folder (the Library). */
+  async getVideos() {
+    const names = await fs.readdir(this.folder);
+    return names.filter((n) => VIDEO_EXTENSIONS.includes(path.extname(n).toLowerCase())).sort();
+  }
+
   async getOverview() {
     const names = (await fs.readdir(this.folder)).sort();
+    const videos = await this.getVideos();
+    const videoOfStem = new Map(videos.map((video) => [videoStem(video), video]));
     const scans: Record<string, object> = {};
     const scanRoot = path.join(this.folder, 'scans');
 
@@ -62,8 +72,10 @@ export class MediaService {
           (await pathExists(path.join(dir, file))) ? `/media/scans/${name}/${file}` : null;
         const detections = await urlOf('detections.json');
 
+        // Your tags are in the database; tags.json (older scans) is copied in on first start.
+        const video = videoOfStem.get(name);
         scans[name] = {
-          tags: await urlOf('tags.json'),
+          tags: video ? `/api/tags?video=${encodeURIComponent(video)}` : await urlOf('tags.json'),
           detections,
           segments: await urlOf('segments.json'),
           updated: detections ? (await fs.stat(path.join(dir, 'detections.json'))).mtimeMs / 1000 : null,
@@ -72,11 +84,12 @@ export class MediaService {
     }
 
     return {
-      videos: names.filter((n) => VIDEO_EXTENSIONS.includes(path.extname(n).toLowerCase())),
+      videos,
       json: names.filter((n) => n.toLowerCase().endsWith('.json')),
       scans,
       targets: await pathExists(path.join(this.folder, 'targets.txt')),
       scanner: await this.bibwatchService.isBuilt(),
+      clocks: await this.videoService.getClocks(),
     };
   }
 }

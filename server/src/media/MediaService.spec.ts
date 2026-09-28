@@ -1,13 +1,14 @@
 import { BibwatchService } from '../bibwatch/BibwatchService';
 import { ConfigService } from '../config/ConfigService';
 import { TemplateService } from '../templates/TemplateService';
+import { VideoService } from '../videos/VideoService';
 
 import { MediaService, videoStem } from './MediaService';
 
 const MEDIA = '/videos/race';
 
 const makeMediaService = () =>
-  new MediaService({ MediaFolder: MEDIA } as ConfigService, {} as BibwatchService);
+  new MediaService({ MediaFolder: MEDIA } as ConfigService, {} as BibwatchService, {} as VideoService);
 
 describe('MediaService.resolve', () => {
   const mediaService = makeMediaService();
