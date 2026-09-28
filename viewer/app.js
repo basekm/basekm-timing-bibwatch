@@ -19,7 +19,7 @@ const state = {
   search: '',
   marking: null,       // null | [] | [{x,y}]
   mediaVideo: null,    // path of the video inside the server's media folder (enables Run scan)
-  server: null,        // /api/media response when served by tools/serve.py
+  server: null,        // /api/media response when served by the local server (server/)
   targets: new Set(),
   needsScan: 0,
   templates: [],       // bib templates available on the server
@@ -121,7 +121,7 @@ $('dataFile').addEventListener('change', (e) => readFile(e.target.files[0]));
 document.addEventListener('dragover', (e) => e.preventDefault());
 document.addEventListener('drop', (e) => { e.preventDefault(); [...e.dataTransfer.files].forEach(readFile); });
 
-// Optional: ?video=URL&data=URL when served by tools/serve.py. Runs once the whole script has
+// Optional: ?video=URL&data=URL when served by the local server (server/). Runs once the whole script has
 // loaded (queued), because loading uses helpers defined further down.
 queueMicrotask(function fromQuery() {
   const q = new URLSearchParams(location.search);
@@ -827,7 +827,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ---------- local server: library + Run scan ----------
-// Only when the viewer is opened through tools/serve.py (127.0.0.1). Scans run on this Mac;
+// Only when the viewer is opened through the local server (server/, 127.0.0.1). Scans run on this Mac;
 // each video's reads accumulate in <media>/scans/<video>/, so a re-run only reads new frames.
 const PHASES = {
   scan: 'Scanning',
@@ -891,7 +891,7 @@ function updateScanUI() {
   const here = state.mediaVideo && video.currentTime > 1 ? ` from ${fmt(video.currentTime, false)}` : '';
   btn.textContent = running ? 'Stop scan' : state.data?.scanning ? `Continue scan${here}` : (state.data?.coarseHits ? `Run scan${here} (update)` : `Run scan${here}`);
   btn.disabled = !running && (!state.server || !state.mediaVideo);
-  btn.title = !state.server ? 'Open the viewer through tools/serve.py to scan from here'
+  btn.title = !state.server ? 'Open the viewer through the local server (server/: npm run start:prod) to scan from here'
     : !state.mediaVideo ? 'Pick the video from the Library (the scanner needs it in the media folder)'
     : 'Read bibs in this video on this Mac (only frames not read before)';
   btn.classList.toggle('attention', !running && state.needsScan > 0);

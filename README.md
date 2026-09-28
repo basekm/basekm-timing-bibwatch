@@ -12,6 +12,7 @@ saved and nothing is uploaded; the viewer opens the video straight from disk.
 
 ```bash
 swift build -c release        # binary: .build/release/bibwatch
+cd server && npm install      # the viewer's local server (NestJS, Node 22)
 ```
 
 ## Quick start (from the viewer)
@@ -20,8 +21,12 @@ swift build -c release        # binary: .build/release/bibwatch
 swift build -c release
 mkdir -p media && ln -s "/path/GX011760.MP4" media/     # videos (symlinks are fine)
 cp targets.txt media/                                  # optional: bib numbers to highlight
-python3 tools/serve.py --media media                   # http://127.0.0.1:8765/
+cd server && npm install && npm run build
+MEDIA_FOLDER=../media npm run start:prod               # http://127.0.0.1:8765/
 ```
+
+Or put `MEDIA_FOLDER` (and `PORT`) in `server/.env.development` / `.env.production`
+(see `server/.env.example`); `npm run dev` rebuilds and restarts on changes.
 
 1. Pick the video from **Library**.
 2. **Run scan** — progress is shown under the playback bar (finding camera positions →
@@ -174,14 +179,19 @@ Load the video and `detections.json` in the viewer:
 ## Opening the viewer
 
 Either open `viewer/index.html` directly in Safari/Chrome and pick (or drag in) the video
-and JSON, or serve it locally (needed for `?video=&data=` links):
+and JSON, or serve it locally (needed for `?video=&data=` links and the Run scan button):
 
 ```bash
-python3 tools/serve.py --media out/media    # binds 127.0.0.1 only
+cd server && MEDIA_FOLDER=../out/media npm run start:prod    # binds 127.0.0.1 only
 # http://127.0.0.1:8765/?video=/media/GX011759.MP4&data=/media/detections.json
 ```
 
-Put the video (a symlink is fine) and JSON in the `--media` folder.
+Put the video (a symlink is fine) and JSON in the `MEDIA_FOLDER`.
+
+The server (`server/`) is a NestJS app laid out like `basekm-timing-backend`: one module per
+area (`media`, `scans`, `templates`, `bibwatch` runs the Swift binary), DTOs and constants in
+`src/@shared`. It serves the viewer at `/`, the media folder at `/media/` (with HTTP Range, so
+video seeking works) and the API at `/api/`.
 
 GoPro files are HEVC. Safari and Chrome on macOS play them. If a browser can't, make a
 proxy — timing stays identical and the boxes still line up:
