@@ -14,8 +14,8 @@ export type ScanJobOptions = {
   targetsPath: string | null;
   registeredPath: string | null;
   templatePaths: string[];
-  /** Without templates: highest bib number to accept (the scanner's own default, 250, fits one race only). */
-  maxBib: number;
+  /** The event's bib rules as scanner options (digits always; number range without templates). */
+  bibArgs: string[];
   /** Read bibs only on people's torsos (experimental). */
   peopleFirst: boolean;
   startAt: number | null;
@@ -113,8 +113,9 @@ export class ScanJob {
       if (!options.templatePaths.length) {
         // Reading the whole frame: accept any bib design. The scanner's colour check only knows
         // one design (white digits on magenta) and rejects every other race's bibs.
-        args.push('--no-color', '--max-bib', String(options.maxBib));
+        args.push('--no-color');
       }
+      args.push(...options.bibArgs);
       if (options.peopleFirst) {
         args.push('--people-first');
       }

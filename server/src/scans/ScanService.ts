@@ -10,6 +10,7 @@ import { SegmentsSaveRequestDto } from '../@shared/dto/SegmentsSaveRequestDto';
 import { pathExists } from '../@shared/lib/pathExists';
 import { writeJsonAtomic } from '../@shared/lib/writeJsonAtomic';
 import { BibwatchService } from '../bibwatch/BibwatchService';
+import { EventService } from '../event/EventService';
 import { MediaService } from '../media/MediaService';
 import { SightingImportService } from '../sightings/SightingImportService';
 import { SightingService } from '../sightings/SightingService';
@@ -24,6 +25,7 @@ export class ScanService {
 
   constructor(
     private readonly bibwatchService: BibwatchService,
+    private readonly eventService: EventService,
     private readonly mediaService: MediaService,
     private readonly templateService: TemplateService,
     private readonly sightingService: SightingService,
@@ -76,20 +78,13 @@ export class ScanService {
       targetsPath: await optional(path.join(media, 'targets.txt')),
       registeredPath,
       templatePaths,
-      maxBib: await this.maxBibOf(registeredPath),
+      bibArgs: this.eventService.bibArgsOf(await this.eventService.getBibRules(), { withRange: templatePaths.length === 0 }),
       peopleFirst: Boolean(body.peopleFirst),
       startAt: body.from ?? null,
     });
     void run.then(() => this.sightingImportService.importDetections(body.video)).catch(() => undefined);
 
     return job.getStatus();
-  }
-
-  /** Highest bib in the race's participant list (registered.txt), else any 4-digit number. */
-  private async maxBibOf(registeredPath: string | null) {
-    const text = registeredPath ? await fs.readFile(registeredPath, 'utf8').catch(() => '') : '';
-    const bibs = text.split(/[\s,]+/).map(Number).filter((n) => Number.isInteger(n) && n > 0);
-    return bibs.length ? Math.max(...bibs) : 9999;
   }
 
   async cancel() {

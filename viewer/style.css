@@ -93,13 +93,13 @@ main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; height: calc(
 #library { max-width: 220px; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 3px 6px; }
 
 /* Clear scans dialog */
-dialog#clearDialog { max-width: 460px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text); padding: 18px 20px; }
-dialog#clearDialog::backdrop { background: rgba(0, 0, 0, 0.55); }
-dialog#clearDialog h3 { margin: 0 0 8px; font-size: 16px; }
-dialog#clearDialog p { margin: 6px 0; font-size: 13px; }
-dialog#clearDialog .actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 14px; }
-dialog#clearDialog button { background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 6px 12px; cursor: pointer; }
-dialog#clearDialog button:hover { border-color: var(--accent); }
+dialog#clearDialog, dialog#bibDialog { max-width: 460px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text); padding: 18px 20px; }
+dialog#clearDialog::backdrop, dialog#bibDialog::backdrop { background: rgba(0, 0, 0, 0.55); }
+dialog#clearDialog h3, dialog#bibDialog h3 { margin: 0 0 8px; font-size: 16px; }
+dialog#clearDialog p, dialog#bibDialog p { margin: 6px 0; font-size: 13px; }
+dialog#clearDialog .actions, dialog#bibDialog .actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+dialog#clearDialog button, dialog#bibDialog .actions button { background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 6px 12px; cursor: pointer; }
+dialog#clearDialog button:hover, dialog#bibDialog .actions button:hover { border-color: var(--accent); }
 dialog#clearDialog button.danger { border-color: var(--target); color: var(--target); }
 
 /* Tags */
@@ -178,3 +178,11 @@ dialog#uiDialog button.primary { background: var(--accent); border-color: var(--
 #controls button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 #controls button.primary:disabled { background: var(--panel); border-color: var(--line); color: var(--muted); }
 #filters button[hidden] { display: none; }
+
+/* Bib numbers dialog */
+#bibDialog .bibForm { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; margin: 12px 0; }
+#bibDialog .bibForm label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+#bibDialog .bibForm select, #bibDialog .bibForm input { background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 5px 6px; color: inherit; font: inherit; }
+#bibDialog .small { font-size: 12px; }
+#bibDialog .actions button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+#moreMenu .menuItem .muted { margin-left: auto; font-size: 12px; }

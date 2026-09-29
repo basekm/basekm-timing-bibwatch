@@ -24,12 +24,12 @@ export class SightingSearchQueryDto {
     return Boolean(this.bib?.trim() || this.tag?.trim());
   }
 
-  /** The bib as stored (4 digits, zero-padded) plus the text as typed, for fragments like "014". */
+  /** The bib as typed, plus zero-padded to 4 (how 4-digit events store "0147"; 147 finds it). */
   get bibCandidates() {
     const bib = this.bib?.trim();
     if (!bib) {
       return [];
     }
-    return /^\d{1,4}$/.test(bib) ? [...new Set([bib.padStart(4, '0'), bib])] : [bib];
+    return /^\d{1,3}$/.test(bib) ? [...new Set([bib.padStart(4, '0'), bib])] : [bib];
   }
 }

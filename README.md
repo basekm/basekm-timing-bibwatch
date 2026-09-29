@@ -70,6 +70,20 @@ Under the video: play and step buttons, **Run scan** (with *people only*), **Set
 position, export segments.json, clear scans, what to draw on the video, trackpad settings, and
 the keyboard shortcuts.
 
+## Bib numbers (per event)
+
+**⋯ More › Bib numbers…** sets how many digits bib numbers have at this event — races can mix
+lengths (e.g. 4 to 6: 4-digit 5K bibs, 6-digit marathon bibs) — and optionally the lowest and
+highest bib. It is saved in the event's database (the media folder), so every video of the event
+is scanned with it. A number one digit shorter than the fewest is kept as a partial read.
+The classic 4 digits keeps the zero-padding earlier scans use ("147" is stored as "0147").
+
+Put the participant list in the media folder as **`registered.txt`** (one bib number per line,
+next to the videos). Bibs not in it are tagged *006 Not registered*, and with no highest bib set
+the highest registered number is used. With mixed lengths it matters most: only the list tells a
+5-digit bib from a 6-digit one with a digit hidden. Changing the rules makes the next scan of
+each video read it again from the start. Command line: `scan … --digits 4-6 [--min-bib N]`.
+
 ## Bib templates (less noise, faster)
 
 A template is one bib design, **measured — not trained**: band colour, digit colour, digit

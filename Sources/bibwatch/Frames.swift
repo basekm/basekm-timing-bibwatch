@@ -108,25 +108,49 @@ enum BibColor {
   }
 }
 
-/// Bib numbers in this race are 0001–0250. OCR often drops the leading 0 (or a digit is
-/// hidden behind someone), so 3-digit runs are kept as fragments.
+/// Bib numbers: how many digits (per event; races can mix lengths, e.g. 4-digit 5K and
+/// 6-digit marathon bibs) and the number range. A run one digit shorter than the fewest is kept
+/// as a fragment (a digit hidden behind someone, or dropped by the reader).
+/// The classic setting, 4 digits, pads fragments to 4 ("014" → "0014") as earlier scans did.
 enum BibText {
   static let letterFix: [Character: Character] = ["O": "0", "o": "0", "D": "0", "Q": "0", "I": "1", "l": "1", "|": "1", "S": "5", "B": "8", "Z": "2"]
 
+  /// Set once per command from --digits MIN-MAX and --min-bib (see `applyBibOptions`).
+  static var minDigits = 4, maxDigits = 4, minBib = 1
+  static var isClassic: Bool { minDigits == 4 && maxDigits == 4 }
+
   static func candidates(_ text: String, maxBib: Int) -> [String] { numbers(text, maxBib: maxBib).map(\.bib) }
 
-  /// Numbers in the text, with whether each was only a 3-digit fragment (padded to 4).
+  /// Numbers in the text, with whether each was only a fragment.
   static func numbers(_ text: String, maxBib: Int) -> [(bib: String, fragment: Bool)] {
     let fixed = String(text.map { letterFix[$0] ?? $0 })
+    let lo = min(minBib, maxBib)
     var out: [(String, Bool)] = [], run = ""
     for ch in fixed + " " {
       if ch.isNumber { run.append(ch); continue }
-      if run.count == 4, let n = Int(run), (1...maxBib).contains(n) { out.append((run, false)) }
-      if run.count == 3, let n = Int(run), (1...maxBib).contains(n) { out.append((String(format: "%04d", n), true)) }
+      if let n = Int(run) {
+        if (minDigits...maxDigits).contains(run.count), (lo...maxBib).contains(n) {
+          out.append((run, false))
+        } else if run.count == minDigits - 1, run.count > 0, (1...maxBib).contains(n) {
+          out.append((isClassic ? String(format: "%04d", n) : run, true))
+        }
+      }
       run = ""
     }
     return out
   }
+}
+
+/// --digits MIN-MAX (e.g. 4-6) and --min-bib N, for every command that reads numbers.
+func applyBibOptions(_ args: Args) {
+  if let d = args.options["digits"] {
+    let parts = d.split(separator: "-").compactMap { Int($0) }
+    guard let a = parts.first, let b = parts.last, (1...9).contains(a), (a...9).contains(b) else {
+      die("--digits needs MIN-MAX between 1 and 9, e.g. 4-6")
+    }
+    (BibText.minDigits, BibText.maxDigits) = (a, b)
+  }
+  if let m = args.options["min-bib"].flatMap(Int.init) { BibText.minBib = max(1, m) }
 }
 
 struct BibRead: Codable {

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { ConfigModule } from './config/ConfigModule';
 import { DatabaseModule } from './database/DatabaseModule';
+import { EventModule } from './event/EventModule';
 import { HealthModule } from './health/HealthModule';
 import { MediaModule } from './media/MediaModule';
 import { ScanModule } from './scans/ScanModule';
@@ -12,6 +13,7 @@ import { TemplateModule } from './templates/TemplateModule';
   imports: [
     ConfigModule,
     DatabaseModule,
+    EventModule,
     HealthModule,
     MediaModule,
     ScanModule,

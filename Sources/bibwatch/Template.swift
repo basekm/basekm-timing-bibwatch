@@ -263,6 +263,7 @@ func readCandidates(_ image: CGImage, _ cands: [(BibCandidate, BibTemplate)]) ->
 func runTemplate(_ raw: [String]) {
   let (points, restArgs) = takePoints(raw)
   let args = Args(restArgs, switches: [])
+  applyBibOptions(args)
   // From a bib in the footage instead of artwork: bibwatch template --from-video V --at t,x,y out.json
   if let videoPath = args.options["from-video"] {
     guard let out = args.positional.first, !points.isEmpty else { die("usage: bibwatch template --from-video <video> --at t,x,y [--at …] <template.json> [--name N] [--min-bib 1] [--max-bib 250]") }
@@ -320,6 +321,7 @@ func runTemplate(_ raw: [String]) {
 func runCalibrate(_ raw: [String]) {
   let (points, rest) = takePoints(raw)
   let args = Args(rest, switches: [])
+  applyBibOptions(args)
   guard args.positional.count >= 2, !points.isEmpty else { die("usage: bibwatch calibrate <template.json> <video> --at t,x,y [--at t,x,y …]") }
   let tpl = calibrateTemplate(readJSON(BibTemplate.self, args.positional[0]), video: VideoSource(path: args.positional[1]), points: points)
   writeJSON(tpl, args.positional[0])
@@ -418,6 +420,7 @@ func calibrateTemplate(_ start: BibTemplate, video: VideoSource, points: [(Doubl
 /// bibwatch finder <video> --template T --at t   → JSON: candidate areas + numbers read (for the viewer overlay).
 func runFinder(_ raw: [String]) {
   let args = Args(raw, switches: [])
+  applyBibOptions(args)
   guard args.positional.count >= 1, let tplPaths = args.all["template"], let at = args.options["at"] else {
     die("usage: bibwatch finder <video> --template template.json [--template another.json …] --at seconds")
   }

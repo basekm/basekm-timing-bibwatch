@@ -17,6 +17,8 @@
         <div class="menuGroup">Open files</div>
         <label class="menuItem">Video file…<input id="videoFile" type="file" accept="video/*" hidden></label>
         <label class="menuItem">Detections / segments JSON…<input id="dataFile" type="file" accept=".json,application/json" hidden></label>
+        <div class="menuGroup eventOnly" hidden>This event</div>
+        <button id="eventBibs" class="menuItem eventOnly" hidden title="How many digits bib numbers have at this event (and their range)">Bib numbers… <span id="eventBibsSummary" class="muted"></span></button>
         <div class="menuGroup">This video</div>
         <button id="splitSegment" class="menuItem" title="S — start a new camera position at the playhead (e.g. after the camera was bumped)">Split camera position here <kbd>S</kbd></button>
         <button id="exportSegments" class="menuItem">Export segments.json</button>
@@ -117,6 +119,24 @@
     </aside>
   </main>
 
+  <dialog id="bibDialog">
+    <form method="dialog">
+      <h3>Bib numbers at this event</h3>
+      <p class="muted">For every video in this media folder. Races can mix lengths, e.g. 4-digit 5K bibs and 6-digit marathon bibs.</p>
+      <div class="bibForm">
+        <label>Fewest digits <select id="bibMinDigits"></select></label>
+        <label>Most digits <select id="bibMaxDigits"></select></label>
+        <label>Lowest bib <input id="bibMinBib" type="number" min="1" placeholder="1"></label>
+        <label>Highest bib <input id="bibMaxBib" type="number" min="1" placeholder="auto"></label>
+      </div>
+      <p id="bibRegistered" class="muted small"></p>
+      <p class="muted small">Videos scanned with other rules are read again from the start on their next scan.</p>
+      <div class="actions">
+        <button value="cancel">Cancel</button>
+        <button value="save" class="primary">Save</button>
+      </div>
+    </form>
+  </dialog>
   <dialog id="clearDialog">
     <form method="dialog">
       <h3>Clear scans for <span id="clearVideo"></span>?</h3>

@@ -879,6 +879,7 @@ async function probeServer() {
   if (state.server) {
     $('libraryWrap').hidden = false;
     loadTemplates();
+    loadEvent();
     $('searchAllPanel').hidden = false;
     for (const v of state.server.videos) {
       const o = document.createElement('option'); o.value = v; o.textContent = v + (state.server.scans[v.replace(/\.[^.]+$/, '')]?.detections ? '  ✓ scanned' : '');
@@ -1398,3 +1399,43 @@ async function openSighting(s) {
 $('moreMenu').querySelectorAll('button.menuItem, input[type=file]').forEach((el) =>
   el.addEventListener(el.type === 'file' ? 'change' : 'click', () => { $('moreMenu').open = false; }));
 document.addEventListener('click', (e) => { if ($('moreMenu').open && !$('moreMenu').contains(e.target)) $('moreMenu').open = false; });
+
+// ---------- this event: bib number rules (saved in the server's database) ----------
+state.event = null;
+const bibRulesText = (e) => `${e.minDigits === e.maxDigits ? e.minDigits : `${e.minDigits}–${e.maxDigits}`} digits`;
+
+async function loadEvent() {
+  try { state.event = await api('/api/event'); } catch (_) { return; }
+  document.querySelectorAll('.eventOnly').forEach((el) => { el.hidden = false; });
+  $('eventBibsSummary').textContent = bibRulesText(state.event);
+}
+
+for (const id of ['bibMinDigits', 'bibMaxDigits']) {
+  $(id).innerHTML = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `<option value="${n}">${n}</option>`).join('');
+}
+
+$('eventBibs').addEventListener('click', () => {
+  const e = state.event;
+  if (!e) return;
+  $('bibMinDigits').value = e.minDigits; $('bibMaxDigits').value = e.maxDigits;
+  $('bibMinBib').value = e.minBib ?? ''; $('bibMaxBib').value = e.maxBib ?? '';
+  const r = e.registered;
+  $('bibRegistered').textContent = r.count
+    ? `registered.txt: ${r.count} bibs (highest ${r.highest}). With mixed lengths it tells a 5-digit bib from a 6-digit one with a digit hidden.`
+    : `No participant list yet: put registered.txt (one bib per line) in ${r.file.replace(/\/registered\.txt$/, '')} — it tells a 5-digit bib from a 6-digit one with a digit hidden.`;
+  $('bibDialog').returnValue = 'cancel';
+  $('bibDialog').showModal();
+});
+
+$('bibDialog').addEventListener('close', async () => {
+  if ($('bibDialog').returnValue !== 'save') return;
+  const num = (id) => ($(id).value.trim() === '' ? null : Number($(id).value));
+  const body = { minDigits: Number($('bibMinDigits').value), maxDigits: Number($('bibMaxDigits').value), minBib: num('bibMinBib'), maxBib: num('bibMaxBib') };
+  const before = state.event && bibRulesText(state.event) + state.event.minBib + state.event.maxBib;
+  try {
+    state.event = await api('/api/event', body);
+    $('eventBibsSummary').textContent = bibRulesText(state.event);
+    const changed = before !== bibRulesText(state.event) + state.event.minBib + state.event.maxBib;
+    setStatus(changed ? `Bib numbers: ${bibRulesText(state.event)}. Saved for this event — the next Run scan reads each video again with these rules.` : 'Bib numbers unchanged.');
+  } catch (err) { uiAlert(`Could not save: ${err.message}`); }
+});

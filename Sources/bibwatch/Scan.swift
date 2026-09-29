@@ -46,6 +46,9 @@ struct ScanSettings: Codable, Equatable {
   var template: String? = nil
   /// "people-first": text is read only on the torsos of people found in the frame.
   var reader: String? = nil
+  /// Bib digits "MIN-MAX" when not the classic 4; lowest bib when above 1.
+  var digits: String? = nil
+  var minBib: Int? = nil
 }
 
 /// Everything the viewer needs, and everything a later scan can reuse.
@@ -202,11 +205,12 @@ func runScan(_ raw: [String]) {
   let args = Args(raw, switches: ["no-color", "fresh", "people-first", "profile"])
   Profile.enabled = args.switches.contains("profile")
   Profile.begin()
+  applyBibOptions(args)
   guard args.positional.count >= 2 else {
     die("""
       usage: bibwatch scan <video> <outDir> [--targets targets.txt] [--segments segments.json | --mat X0,Y0,X1,Y1]
                            [--clock HH:MM:SS] [--every 0.5] [--fine-fps 10] [--pad 4] [--start mm:ss] [--end mm:ss]
-                           [--max-bib 250] [--no-color] [--template template.json …] [--registered bibs.txt]
+                           [--max-bib 250] [--min-bib 1] [--digits 4-6] [--no-color] [--template template.json …] [--registered bibs.txt]
                            [--from mm:ss] [--fresh] [--people-first] [--profile] [--progress json]
 
       Frame reads are kept in <outDir>/detections.json and reused by later scans of the same
@@ -223,7 +227,9 @@ func runScan(_ raw: [String]) {
   }.joined(separator: " | ")
   let settings = ScanSettings(every: args.double("every", 0.5), fineFps: args.double("fine-fps", 10), pad: args.double("pad", 4),
                               maxBib: templates.map(\.maxBib).max() ?? Int(args.double("max-bib", 250)), colorCheck: !args.switches.contains("no-color"),
-                              template: templateID, reader: args.switches.contains("people-first") ? "people-first" : nil)
+                              template: templateID, reader: args.switches.contains("people-first") ? "people-first" : nil,
+                              digits: BibText.isClassic ? nil : "\(BibText.minDigits)-\(BibText.maxDigits)",
+                              minBib: BibText.minBib > 1 ? BibText.minBib : nil)
   let clockSeconds = args.options["clock"].map(parseTime)
   let targets: Set<String> = args.options["targets"].map { path in
     Set((try? String(contentsOfFile: path, encoding: .utf8))?

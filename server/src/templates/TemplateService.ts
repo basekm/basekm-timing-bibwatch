@@ -15,6 +15,7 @@ import { TemplateCreateRequestDto } from '../@shared/dto/TemplateCreateRequestDt
 import { Mutex } from '../@shared/lib/Mutex';
 import { isFile, pathExists } from '../@shared/lib/pathExists';
 import { BibwatchService } from '../bibwatch/BibwatchService';
+import { EventService } from '../event/EventService';
 import { MediaService } from '../media/MediaService';
 
 const TEMPLATE_ID = /^[A-Za-z0-9._ ()-]+$/;
@@ -29,6 +30,7 @@ export class TemplateService {
 
   constructor(
     private readonly bibwatchService: BibwatchService,
+    private readonly eventService: EventService,
     private readonly mediaService: MediaService,
   ) {}
 
@@ -87,7 +89,8 @@ export class TemplateService {
     const baseId = name.replace(/[^A-Za-z0-9._ ()-]+/g, '-').replace(/^[-. ]+|[-. ]+$/g, '') || 'bib';
     await fs.mkdir(this.folder, { recursive: true });
 
-    const extra = ['--name', name, '--max-bib', String(body.maxBib || 250)];
+    const digits = this.eventService.bibArgsOf(await this.eventService.getBibRules(), { withRange: false });
+    const extra = ['--name', name, '--max-bib', String(body.maxBib || 250), ...digits];
     if (body.minBib) {
       extra.push('--min-bib', String(body.minBib));
     }
@@ -140,8 +143,9 @@ export class TemplateService {
     }
 
     const [t, x, y] = body.at;
+    const digits = this.eventService.bibArgsOf(await this.eventService.getBibRules(), { withRange: false });
     const result = await this.templateLock.run(() =>
-      this.bibwatchService.run(['calibrate', templatePath, video, '--at', `${t},${x},${y}`]),
+      this.bibwatchService.run(['calibrate', templatePath, video, '--at', `${t},${x},${y}`, ...digits]),
     );
     if (result.code !== 0) {
       throw new UnprocessableEntityException({ error: (result.stderr || result.stdout).trim().slice(-300) });
@@ -169,7 +173,7 @@ export class TemplateService {
       throw new BadRequestException({ error: 'video or templates missing' });
     }
 
-    const args = ['finder', video, '--at', query.t];
+    const args = ['finder', video, '--at', query.t, ...this.eventService.bibArgsOf(await this.eventService.getBibRules(), { withRange: false })];
     for (const templatePath of templatePaths) {
       args.push('--template', templatePath);
     }
