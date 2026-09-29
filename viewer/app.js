@@ -457,6 +457,13 @@ function visible(s) {
 }
 
 function renderList() {
+  // The Targets filter only when this video has target bibs.
+  const targetsBtn = document.querySelector('#filters [data-filter="targets"]');
+  targetsBtn.hidden = !state.targets.size;
+  if (targetsBtn.hidden && state.filter === 'targets') {
+    state.filter = 'all';
+    document.querySelectorAll('#filters button').forEach((b) => b.classList.toggle('active', b.dataset.filter === 'all'));
+  }
   const list = $('list');
   list.innerHTML = '';
   state.sightings.forEach((s, i) => {
@@ -920,7 +927,6 @@ function updateScanUI() {
     : !state.mediaVideo ? 'Pick the video from the Library (the scanner needs it in the media folder)'
     : 'Read bibs in this video on this Mac (only frames not read before)';
   btn.classList.toggle('attention', !running && state.needsScan > 0);
-  $('resync').disabled = !state.data?.coarseHits;
   $('clearScans').disabled = running || !state.server || !state.mediaVideo;
 }
 
@@ -1031,7 +1037,6 @@ function saveSegmentsSoon() {
 }
 window.addEventListener('beforeunload', (e) => { if (saveTimer) { e.preventDefault(); e.returnValue = ''; } });
 
-$('resync').addEventListener('click', () => resync());
 
 // Clear the saved scan of this video (asks first; can keep the mats / camera fixes).
 $('clearScans').addEventListener('click', () => {
@@ -1387,3 +1392,9 @@ async function openSighting(s) {
   const seek = () => { video.pause(); video.currentTime = Math.max(0, s.at - 1); selectSighting(s.key); };
   if (video.readyState >= 1) seek(); else video.addEventListener('loadedmetadata', seek, { once: true });
 }
+
+// ---------- ⋯ More menu ----------
+// Closes after choosing an action, and when clicking anywhere else.
+$('moreMenu').querySelectorAll('button.menuItem, input[type=file]').forEach((el) =>
+  el.addEventListener(el.type === 'file' ? 'change' : 'click', () => { $('moreMenu').open = false; }));
+document.addEventListener('click', (e) => { if ($('moreMenu').open && !$('moreMenu').contains(e.target)) $('moreMenu').open = false; });

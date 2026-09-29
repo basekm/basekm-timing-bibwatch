@@ -10,9 +10,28 @@
   <header>
     <strong>bibwatch</strong>
     <label class="file" id="libraryWrap" hidden>Library <select id="library"><option value="">Choose a video…</option></select></label>
-    <label class="file">Video <input id="videoFile" type="file" accept="video/*"></label>
-    <label class="file">Detections / segments JSON <input id="dataFile" type="file" accept=".json,application/json"></label>
-    <span id="status" class="muted">Drop a video and its detections.json (or segments.json) anywhere. Files stay on this computer.</span>
+    <span id="status" class="muted">Drop a video and its detections.json (or segments.json) anywhere — or ⋯ More › Open. Files stay on this computer.</span>
+    <details id="moreMenu">
+      <summary title="Less-used tools and settings">⋯ More</summary>
+      <div class="menuBody">
+        <div class="menuGroup">Open files</div>
+        <label class="menuItem">Video file…<input id="videoFile" type="file" accept="video/*" hidden></label>
+        <label class="menuItem">Detections / segments JSON…<input id="dataFile" type="file" accept=".json,application/json" hidden></label>
+        <div class="menuGroup">This video</div>
+        <button id="splitSegment" class="menuItem" title="S — start a new camera position at the playhead (e.g. after the camera was bumped)">Split camera position here <kbd>S</kbd></button>
+        <button id="exportSegments" class="menuItem">Export segments.json</button>
+        <button id="clearScans" class="menuItem danger" title="Delete the saved scan of this video">Clear scans…</button>
+        <div class="menuGroup">Show on the video</div>
+        <label class="menuItem"><input id="showPeople" type="checkbox" checked> People boxes</label>
+        <label class="menuItem"><input id="showAll" type="checkbox" checked> All bibs (not only crossed / targets)</label>
+        <div class="menuGroup">Trackpad</div>
+        <label class="menuItem" title="How far a trackpad / Magic Mouse swipe moves the video (hold ⌥ Option for 10× faster)">
+          Swipe speed <input id="swipeSpeed" type="range" min="0" max="100" step="1" value="35"> <span id="swipeSpeedLabel" class="speedLabel"></span>
+        </label>
+        <label class="menuItem" title="Flip which way a swipe moves the video"><input id="swipeReverse" type="checkbox"> Reverse swipe direction</label>
+        <div class="menuGroup muted">Keys: Space play · ←/→ 0.1 s · ⇧←/→ 1 s · J/K/L · [/] prev/next sighting · M mat · S split · R re-sync</div>
+      </div>
+    </details>
   </header>
 
   <main>
@@ -48,24 +67,11 @@
           <option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option>
         </select>
         <span class="sep"></span>
-        <button id="runScan" title="Read bibs in this video on this Mac (only frames not read before)">Run scan</button>
+        <button id="runScan" class="primary" title="Read bibs in this video on this Mac (only frames not read before)">Run scan</button>
         <label class="toggle" title="Experimental: find people first and read bibs only on their torsos (fewer missed small bibs, faster text reading). Changing it scans this video again from the start."><input id="peopleFirst" type="checkbox"> people only</label>
-        <button id="resync" title="R — re-decide crossings with the current mats and camera segments">Re-sync</button>
-        <button id="clearScans" title="Delete the saved scan of this video">Clear scans…</button>
         <span class="sep"></span>
         <button id="setClock" title="Pause on a known crossing and enter its reader time">Set clock…</button>
         <button id="markMat" title="M — click the two ends of the mat's near edge">Mark mat</button>
-        <button id="splitSegment" title="S — start a new camera segment at the playhead (e.g. after the camera was bumped)">Split here</button>
-        <button id="exportSegments">Export segments.json</button>
-        <span class="sep"></span>
-        <label class="toggle" title="How far a trackpad / Magic Mouse swipe moves the video (hold ⌥ Option for 10× faster)">
-          Swipe speed <input id="swipeSpeed" type="range" min="0" max="100" step="1" value="35">
-          <span id="swipeSpeedLabel" class="speedLabel"></span>
-        </label>
-        <label class="toggle" title="Flip which way a swipe moves the video"><input id="swipeReverse" type="checkbox"> reverse</label>
-        <span class="sep"></span>
-        <label class="toggle"><input id="showPeople" type="checkbox" checked> people</label>
-        <label class="toggle"><input id="showAll" type="checkbox" checked> all bibs</label>
       </div>
     </section>
 

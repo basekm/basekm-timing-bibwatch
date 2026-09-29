@@ -34,7 +34,7 @@ Or put `MEDIA_FOLDER` (and `PORT`) in `server/.env.development` / `.env.producti
 3. Mark the mat for each camera position where it's visible (**M**) — optional: without a
    mat, bibs there are tagged **001 Viewed** instead of **000 Crossed the mat**; split camera positions if needed
    (**S**), set the clock. Every change **re-syncs instantly**: crossings are
-   re-decided from the reads already made, no re-scan needed (also **R** / *Re-sync*).
+   re-decided from the reads already made, no re-scan needed (**R** to re-sync by hand).
 4. If a change needs frames that were never read, those sightings show as `needs-scan` and **Run scan (update)** is highlighted —
    it only reads the missing frames and adds them to what's there.
 
@@ -62,6 +62,13 @@ This comes from the server's SQLite database, `<media>/bibwatch.sqlite` (or
 re-sync in the viewer), your tags and each video's clock. `detections.json` stays the scanner's
 output; on start the server reads in any that are newer than what it has, and any `tags.json`
 from before tags moved into the database.
+
+## The viewer at a glance
+
+Under the video: play and step buttons, **Run scan** (with *people only*), **Set clock…** and
+**Mark mat**. Everything else is in **⋯ More** (top right): open files, split a camera
+position, export segments.json, clear scans, what to draw on the video, trackpad settings, and
+the keyboard shortcuts.
 
 ## Bib templates (less noise, faster)
 
@@ -127,13 +134,13 @@ For each **fixed** segment where the mat is visible (green on the timeline, grey
 1. Go to a moment where the mat is visible.
 2. Press **M** (or *Mark mat*) and click the two ends of the **near edge of the black mat**
    (the edge runners step onto first). It can be slanted.
-3. Click **Export segments.json**.
+3. Mats are saved as you mark them; **⋯ More › Export segments.json** saves a copy.
 
 The automatic split can be off by a few seconds, or miss a move. Correct it in the viewer:
 
 - **M in a "moving" stretch** makes it still from that moment (joined with the still
   segment that follows), then you mark the mat.
-- **S — Split here**: start a new segment at the playhead (e.g. the camera was bumped),
+- **S — Split camera position here** (also in **⋯ More**): start a new segment at the playhead (e.g. the camera was bumped),
   then re-mark the mat on the new part.
 
 Edits are kept in the exported `segments.json`; re-run `scan` with it.
@@ -187,7 +194,7 @@ Load the video and `detections.json` in the viewer:
 - **Scrubber** (QuickTime-style): drag anywhere and the picture follows; hover shows the
   video and reader time; elapsed/remaining on either side. The bar also shows camera
   positions (green = mat marked, grey = no mat) and crossing ticks.
-- **Trackpad / Magic Mouse**: swipe sideways over the video to scrub. **Swipe speed**
+- **Trackpad / Magic Mouse**: swipe sideways over the video to scrub. **Swipe speed** (in **⋯ More**)
   slider sets how far a swipe goes (shown as seconds per typical swipe, from ≈0.3 s for
   frame-by-frame work to ≈30 s; default ≈1.5 s), **reverse** flips the direction; both are
   remembered in the browser. Hold `⌥ Option` for 10× faster. On the bar, swiping or scrolling moves the
