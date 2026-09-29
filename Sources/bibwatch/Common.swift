@@ -111,7 +111,8 @@ struct Segment: Codable {
   var index: Int
   var from: Double
   var to: Double
-  /// "fixed" = camera still; "moving" = being repositioned (no crossings counted).
+  /// "fixed" = camera still; "moving" = being repositioned. Only a boundary between camera
+  /// positions (each has its own mat); bibs are captured the same in both.
   var kind: String
   /// A representative still frame time for marking the mat.
   var refTime: Double

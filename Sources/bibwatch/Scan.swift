@@ -104,7 +104,8 @@ func evaluate(_ w: Window, frames allFrames: [OverlayFrame], pad: Double, fineFp
               target: Bool, clock: Double?) -> Sighting {
   var s = Sighting(bib: w.bib, target: target, segment: w.seg.index, from: w.from, to: w.to,
                    coarseFrames: w.count, label: "viewed", cross: nil, crossClock: nil, reads: 0, tracked: 0, note: "")
-  guard w.seg.kind == "fixed" else { s.label = "camera-moving"; s.note = "camera was being moved"; return s }
+  // Every bib in front of the camera is captured and decided the same way, camera moving or
+  // not: a "moving" stretch simply has no mat, so its bibs are tagged 001 Viewed.
 
   let lo = max(w.seg.from, w.from - pad), hi = min(w.seg.to, w.to + pad)
   let frames = allFrames.filter { $0.people != nil && $0.t >= lo - 1e-6 && $0.t <= hi + 1e-6 }

@@ -32,7 +32,7 @@ func runSegments(_ raw: [String]) {
     let sd = max(sqrt(v.map { ($0 - mean) * ($0 - mean) }.reduce(0, +) / Double(v.count)), 0.02)
     return v.map { ($0 - mean) / sd }
   }
-  func diff(_ a: [Double], _ b: [Double]) -> Double {
+  func diff(_ a: [Double], _ b: [Double], percentile: Double = percentile) -> Double {
     var cells: [Double] = []
     for cy in stride(from: 0, to: rows, by: cell) {
       for cx in stride(from: 0, to: cols, by: cell) {
@@ -148,6 +148,43 @@ func runSegments(_ raw: [String]) {
       }
     }
     merged.append(s)
+  }
+  // Someone standing right in front of the lens for a while (a marshal handing out medals)
+  // changes almost every cell, like a move. But a camera that really moved doesn't come back
+  // to the same view later: if a share of a still stretch shows the view of an earlier one,
+  // the camera never moved in between — join them, "moves" included. (A share, not one
+  // moment: in a long busy video two crowd frames can look alike by chance.) Kept strict on
+  // purpose: joining a real move would put the wrong mat on a view; a false move only tags
+  // the bibs there 004 Camera moving (they are still read).
+  let sameShare = args.double("same-share", 0.10)
+  // Judged on the typical cell (median), not the 10% most alike: sky and road alone must not
+  // make two views "the same". Moments with someone at the lens simply don't match.
+  let viewPercentile = args.double("view-percentile", 0.5)
+  func samples(_ s: Segment, count n: Int = 24) -> [[Double]] {
+    let idx = times.indices.filter { times[$0] >= s.from && times[$0] <= s.to }
+    guard !idx.isEmpty else { return [sig(near: s.from)] }
+    return stride(from: 0, to: idx.count, by: max(1, idx.count / n)).map { sigs[idx[$0]] }
+  }
+  func sameView(_ a: Segment, _ b: Segment) -> Bool {
+    let sa = samples(a), sb = samples(b)
+    func share(_ xs: [[Double]], seenIn ys: [[Double]]) -> Double {
+      Double(xs.filter { x in ys.contains { diff(x, $0, percentile: viewPercentile) < sameThreshold } }.count) / Double(xs.count)
+    }
+    let shareA = share(sa, seenIn: sb), shareB = share(sb, seenIn: sa)
+    if args.switches.contains("debug") {
+      print(String(format: "sameView %@–%@ vs %@–%@: %.0f%% / %.0f%% of moments match", formatTime(a.from), formatTime(a.to),
+                   formatTime(b.from), formatTime(b.to), shareA * 100, shareB * 100))
+    }
+    return min(shareA, shareB) >= sameShare
+  }
+  var i = 0
+  while i < merged.count {
+    if merged[i].kind == "fixed",
+       let j = merged.indices.last(where: { $0 > i && merged[$0].kind == "fixed" && sameView(merged[i], merged[$0]) }) {
+      merged[i].to = merged[j].to
+      merged.removeSubrange((i + 1)...j)
+    }
+    i += 1
   }
   for i in merged.indices where merged[i].kind == "fixed" && merged[i].to - merged[i].from < minFixed {
     merged[i].kind = "moving"

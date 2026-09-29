@@ -44,7 +44,7 @@ main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; height: calc(
 #layers .seg { position: absolute; top: 0; bottom: 0; }
 #layers .seg.fixed { background: rgba(52, 199, 89, 0.28); }
 #layers .seg.fixed.nomat { background: rgba(154, 160, 166, 0.28); }
-#layers .seg.moving { background: rgba(255, 159, 10, 0.5); }
+#layers .seg.moving { background: rgba(154, 160, 166, 0.28); } /* like a position without a mat */
 #layers .tick { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--cross); }
 #layers .tick.target { background: var(--target); width: 3px; }
 #played { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; transform-origin: left center; transform: scaleX(0); background: rgba(255, 255, 255, 0.45); will-change: transform; }

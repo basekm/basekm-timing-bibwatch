@@ -32,11 +32,10 @@ Or put `MEDIA_FOLDER` (and `PORT`) in `server/.env.development` / `.env.producti
 2. **Run scan** — progress is shown under the playback bar (finding camera positions →
    reading bibs → following runners); results load by themselves when it's done.
 3. Mark the mat for each camera position where it's visible (**M**) — optional: without a
-   mat, bibs there are tagged **001 Viewed** instead of **000 Crossed the mat**; fix camera segments if needed
-   (**C** / **S**), set the clock. Every change **re-syncs instantly**: crossings are
+   mat, bibs there are tagged **001 Viewed** instead of **000 Crossed the mat**; split camera positions if needed
+   (**S**), set the clock. Every change **re-syncs instantly**: crossings are
    re-decided from the reads already made, no re-scan needed (also **R** / *Re-sync*).
-4. If a change needs frames that were never read (e.g. a stretch that was "moving" is now
-   still), those sightings show as `needs-scan` and **Run scan (update)** is highlighted —
+4. If a change needs frames that were never read, those sightings show as `needs-scan` and **Run scan (update)** is highlighted —
    it only reads the missing frames and adds them to what's there.
 
 Reads accumulate per video in `media/scans/<video>/detections.json` (with the segments you
@@ -86,7 +85,7 @@ Every bib seen gets a **numbered tag** — the mat is optional:
 | 001 | Viewed | bib seen on screen, no crossing decided — e.g. no mat marked for that camera position |
 | 002 | Near the mat | on or near the mat without a clear crossing (photos, waiting) |
 | 003 | Passing | seen, never close to the mat |
-| 004 | Camera moving | seen while the camera was being moved |
+| 004 | Camera moving | older scans only: every bib is now captured and tagged the same, camera moving or not |
 | 005 | Duplicate | same crossing as another bib (a misread) — the note says which |
 
 Plus detail on each sighting: **zone** (background / before-mat / on-mat / past-mat),
@@ -107,8 +106,8 @@ it gets the next free code (104, 105 …), remembered per video. Tags save per v
 ```
 
 Splits the video wherever the camera was moved (or handled), and ignores people walking
-past the lens. Output: `fixed` segments (camera still) and `moving` segments (no crossings
-are counted there).
+past the lens. Output: `fixed` segments (camera still) and `moving` segments. These only
+separate camera positions, each with its own mat: bibs are captured the same everywhere.
 
 ### 2. Mark the mat (viewer, optional)
 
@@ -123,10 +122,8 @@ For each **fixed** segment where the mat is visible (green on the timeline, grey
 
 The automatic split can be off by a few seconds, or miss a move. Correct it in the viewer:
 
-- **M in a "moving" stretch** asks whether the camera has already settled; say yes and
-  it becomes still from that moment (joined with the still segment that follows), then
-  mark the mat.
-- **C — Camera still / moving**: flip from the playhead onward.
+- **M in a "moving" stretch** makes it still from that moment (joined with the still
+  segment that follows), then you mark the mat.
 - **S — Split here**: start a new segment at the playhead (e.g. the camera was bumped),
   then re-mark the mat on the new part.
 
@@ -166,8 +163,8 @@ same `outDir` reuses every frame already read there (same settings) and only rea
 ones; `--fresh` starts over. `--progress json` prints machine-readable progress.
 
 Labels: `crossed` (with interpolated time), `lingering` (on/near the mat, no clear
-crossing), `passing` (never near the mat), `no-person`, `unclear`, `camera-moving`,
-`no-mat`.
+crossing), `passing` (never near the mat), `no-person`, `unclear`, `no-mat`
+(older scans also have `camera-moving`).
 
 ### 5. Watch it
 
@@ -180,7 +177,7 @@ Load the video and `detections.json` in the viewer:
   Filters: all / crossed / targets / not crossed, and bib search.
 - **Scrubber** (QuickTime-style): drag anywhere and the picture follows; hover shows the
   video and reader time; elapsed/remaining on either side. The bar also shows camera
-  segments (green fixed, orange moving, grey no mat) and crossing ticks.
+  positions (green = mat marked, grey = no mat) and crossing ticks.
 - **Trackpad / Magic Mouse**: swipe sideways over the video to scrub. **Swipe speed**
   slider sets how far a swipe goes (shown as seconds per typical swipe, from ≈0.3 s for
   frame-by-frame work to ≈30 s; default ≈1.5 s), **reverse** flips the direction; both are

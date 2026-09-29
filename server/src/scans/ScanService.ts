@@ -65,6 +65,8 @@ export class ScanService {
       }
     }
 
+    const registeredPath = await optional(path.join(media, 'registered.txt'));
+
     // Not awaited: the scan runs in the background and the viewer polls getStatus().
     // When it ends (done, failed or cancelled), what it saved goes into the database for search.
     const run = job.run({
@@ -72,13 +74,21 @@ export class ScanService {
       segments: body.segments ?? null,
       clock: body.clock ?? null,
       targetsPath: await optional(path.join(media, 'targets.txt')),
-      registeredPath: await optional(path.join(media, 'registered.txt')),
+      registeredPath,
       templatePaths,
+      maxBib: await this.maxBibOf(registeredPath),
       startAt: body.from ?? null,
     });
     void run.then(() => this.sightingImportService.importDetections(body.video)).catch(() => undefined);
 
     return job.getStatus();
+  }
+
+  /** Highest bib in the race's participant list (registered.txt), else any 4-digit number. */
+  private async maxBibOf(registeredPath: string | null) {
+    const text = registeredPath ? await fs.readFile(registeredPath, 'utf8').catch(() => '') : '';
+    const bibs = text.split(/[\s,]+/).map(Number).filter((n) => Number.isInteger(n) && n > 0);
+    return bibs.length ? Math.max(...bibs) : 9999;
   }
 
   async cancel() {

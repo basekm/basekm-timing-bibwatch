@@ -175,7 +175,6 @@ function framesBetween(lo, hi) {
 function evaluate(w, pad, fineFps) {
   const s = { bib: w.bib, target: state.targets.has(w.bib), segment: w.seg.index, from: w.from, to: w.to,
     coarseFrames: w.count, label: 'viewed', cross: null, reads: 0, fullReads: 0, tracked: 0, note: '', zone: null, direction: null };
-  if (w.seg.kind !== 'fixed') { s.label = 'camera-moving'; s.note = 'camera was being moved'; return s; }
   const mat = w.seg.mat;
   const lo = Math.max(w.seg.from, w.from - pad), hi = Math.min(w.seg.to, w.to + pad);
   const frames = framesBetween(lo, hi);
@@ -386,8 +385,6 @@ function draw() {
   // Running clock and segment state.
   const clockText = `▶ ${fmt(t)}` + (reader(t) != null ? `   reader ${fmt(reader(t))}` : '   reader: set clock');
   tag(clockText, r.x + 10, r.y + 30, 'rgba(0,0,0,0.7)', 18);
-  // No banner for a position without a mat: the mat is optional (bibs there are tagged 001 Viewed).
-  if (seg && seg.kind === 'moving') banner('CAMERA MOVING — crossings not counted', r.x + r.w / 2, r.y + 60, '#ff9f0a');
 
   // What the templates find in this (paused) frame.
   if ($('showFinder').checked && state.finder && Math.abs(state.finder.t - t) < 0.05) {
@@ -437,7 +434,7 @@ let lastListKey = '';
 function updateSide(t, seg) {
   $('videoTime').textContent = fmt(t);
   $('readerTime').textContent = reader(t) != null ? fmt(reader(t)) : 'set clock';
-  $('segmentInfo').textContent = seg ? `Segment #${seg.index} · ${seg.kind}${seg.kind === 'fixed' ? (seg.mat ? ' · mat marked' : '') : ''} · ${fmt(seg.from, false)}–${fmt(seg.to, false)}` : '';
+  $('segmentInfo').textContent = seg ? `Camera position #${seg.index}${seg.mat ? ' · mat marked' : ''} · ${fmt(seg.from, false)}–${fmt(seg.to, false)}` : '';
   // Highlight sightings around the current time.
   const key = Math.floor(t * 2);
   if (key === lastListKey) return;
@@ -492,7 +489,7 @@ function renderTimeline() {
     const el = document.createElement('div');
     el.className = `seg ${s.kind}${s.kind === 'fixed' && !s.mat ? ' nomat' : ''}`;
     el.style.left = `${(s.from / dur) * 100}%`; el.style.width = `${((s.to - s.from) / dur) * 100}%`;
-    el.title = `#${s.index} ${s.kind} ${fmt(s.from, false)}–${fmt(s.to, false)}`;
+    el.title = `#${s.index}${s.mat ? ' · mat' : ''} ${fmt(s.from, false)}–${fmt(s.to, false)}`;
     tl.appendChild(el);
   }
   // Shade every part of the video not read yet (scans can start mid-video and wrap round).
@@ -555,7 +552,7 @@ function showHover(e, t) {
   tip.hidden = false;
   tip.style.left = `${Math.min(Math.max(e.clientX - rect.left, 30), rect.width - 30)}px`;
   const seg = segmentAt(t);
-  tip.textContent = fmt(t) + (reader(t) != null ? `  ·  ${fmt(reader(t))}` : '') + (seg && seg.kind === 'moving' ? '  · camera moving' : '');
+  tip.textContent = fmt(t) + (reader(t) != null ? `  ·  ${fmt(reader(t))}` : '') + '';
 }
 
 const timeline = $('timeline');
@@ -780,26 +777,12 @@ function finishSegmentEdit(focus) {
 }
 
 $('splitSegment').addEventListener('click', () => { video.pause(); splitSegment(video.currentTime); });
-$('toggleKind').addEventListener('click', () => {
-  video.pause();
-  const seg = segmentAt(video.currentTime);
-  if (!seg) return;
-  // Flip from the playhead onward (a whole-segment flip when at its start).
-  splitSegment(video.currentTime, seg.kind === 'fixed' ? 'moving' : 'fixed');
-});
 async function toggleMarking() {
   if (!state.segments.length) { uiAlert('Load a segments.json or detections.json first (or run a scan)'); return; }
   video.pause();
   let seg = segmentAt(video.currentTime);
-  if (!state.marking && seg.kind !== 'fixed') {
-    // Automatic detection can end a "moving" stretch a few seconds late (or miss that the
-    // camera had already settled). Let the person watching decide.
-    const t = video.currentTime;
-    const ok = await uiConfirm(`The camera was detected as moving here (${fmt(seg.from, false)}–${fmt(seg.to, false)}).\n\n` +
-      `If it has already settled, treat it as still from ${fmt(t)} onward and mark the mat?`);
-    if (!ok) return;
-    seg = splitSegment(t, 'fixed');
-  }
+  // A mat marked where the camera was detected as moving: it has settled — still from here on.
+  if (!state.marking && seg.kind !== 'fixed') seg = splitSegment(video.currentTime, 'fixed');
   state.marking = state.marking ? null : [];
   $('player').classList.toggle('marking', !!state.marking);
   $('markMat').classList.toggle('on', !!state.marking);
@@ -850,7 +833,6 @@ document.addEventListener('keydown', (e) => {
     const next = e.key === ']' ? times.find((x) => x - 2 > t + 0.05) : [...times].reverse().find((x) => x - 2 < t - 0.05);
     if (next != null) { swipe.lastEnd = 0; video.currentTime = Math.max(0, next - 2); }
   } else if (e.key === 'm' || e.key === 'M') toggleMarking();
-  else if (e.key === 'c' || e.key === 'C') $('toggleKind').click();
   else if (e.key === 'r' || e.key === 'R') resync();
   else if (/^[1-4]$/.test(e.key) && state.selected) toggleTag(PRESET_TAGS[Number(e.key) - 1]);
   else if (e.key === 's' || e.key === 'S') $('splitSegment').click();
