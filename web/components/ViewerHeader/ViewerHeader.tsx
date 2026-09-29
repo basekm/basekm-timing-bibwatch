@@ -1,0 +1,220 @@
+'use client';
+
+import {
+  ReactNode
+} from 'react';
+
+import {
+  AlertCircleIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  Loader2Icon
+} from 'lucide-react';
+import Image from 'next/image';
+
+import {
+  Button
+} from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
+import {
+  cn
+} from '@/lib/utils';
+
+import {
+  SaveState
+} from '@basekm/@shared/constants';
+
+export type ViewerHeaderVideo = {
+  name: string;
+  isScanned: boolean;
+};
+
+export type ViewerHeaderProps = {
+  videos: ViewerHeaderVideo[];
+  selectedVideoName: string | null;
+  summaryText: string | null;
+  saveState: SaveState;
+  saveErrorMessage: string | null;
+  scanStatusText: string | null;
+  scanProgress: number | null;
+  scanButtonLabel: string;
+  isScanButtonShown: boolean;
+  isScanButtonDisabled: boolean;
+  isScanning: boolean;
+  onSelectVideo: (name: string) => void;
+  onScanClick: () => void;
+  actions: ReactNode;
+};
+
+const SaveStateIndicator = ({
+  saveState,
+  saveErrorMessage,
+}: {
+  saveState: SaveState;
+  saveErrorMessage: string | null;
+}) => {
+  if (saveState === SaveState.Saving) {
+    return (
+      <span className="hidden items-center gap-1 text-xs font-semibold text-muted-foreground md:flex">
+        <Loader2Icon className="size-3.5 animate-spin" />
+        Saving…
+      </span>
+    );
+  }
+
+  if (saveState === SaveState.Failed) {
+    return (
+      <span
+        title={saveErrorMessage ?? undefined}
+        className="hidden items-center gap-1 text-xs font-semibold text-destructive md:flex"
+      >
+        <AlertCircleIcon className="size-3.5" />
+        Couldn’t save
+      </span>
+    );
+  }
+
+  if (saveState === SaveState.Saved) {
+    return (
+      <span className="hidden items-center gap-1 text-xs font-semibold text-emerald-600 md:flex">
+        <CheckIcon className="size-3.5" />
+        Saved automatically
+      </span>
+    );
+  }
+
+  return null;
+};
+
+export const ViewerHeader = ({
+  videos,
+  selectedVideoName,
+  summaryText,
+  saveState,
+  saveErrorMessage,
+  scanStatusText,
+  scanProgress,
+  scanButtonLabel,
+  isScanButtonShown,
+  isScanButtonDisabled,
+  isScanning,
+  onSelectVideo,
+  onScanClick,
+  actions,
+}: ViewerHeaderProps) => {
+  const videoPickerLabel = selectedVideoName ?? 'Choose a video…';
+  const hasVideoList = videos.length > 0;
+  const scanProgressWidth = scanProgress === null ? null : `${Math.round(scanProgress * 100)}%`;
+
+  return (
+    <header className="sticky top-0 z-10 flex h-14 w-full items-center justify-between gap-3 border-b border-border/50 bg-background/85 px-3 backdrop-blur-md sm:px-4">
+      <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+        <div className="flex shrink-0 items-center gap-2">
+          <Image
+            src="/logo.svg"
+            alt=""
+            width={22}
+            height={22}
+          />
+          <span className="text-sm font-extrabold tracking-tight">bibwatch</span>
+        </div>
+
+        <div className="h-4 w-px shrink-0 bg-border" />
+
+        <div className="flex min-w-0 items-center gap-2 text-xs font-semibold">
+          <span className="hidden text-muted-foreground sm:inline">Video:</span>
+
+          {hasVideoList && (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={(
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="max-w-56 justify-between gap-1.5 font-bold sm:max-w-72"
+                  />
+                )}
+              >
+                <span className="truncate">{videoPickerLabel}</span>
+                <ChevronDownIcon data-icon="inline-end" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="max-h-96 w-80">
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>Videos in the media folder</DropdownMenuLabel>
+                  <DropdownMenuRadioGroup
+                    value={selectedVideoName ?? ''}
+                    onValueChange={(value) => onSelectVideo(String(value))}
+                  >
+                    {videos.map((video) => (
+                      <DropdownMenuRadioItem
+                        key={video.name}
+                        value={video.name}
+                      >
+                        <span className="truncate">{video.name}</span>
+                        {video.isScanned && <span className="ml-auto text-xs text-emerald-600">scanned</span>}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
+          {!hasVideoList && (
+            <span className="truncate font-bold text-foreground">{videoPickerLabel}</span>
+          )}
+
+          {summaryText && (
+            <span className="hidden truncate font-medium text-muted-foreground lg:inline">{summaryText}</span>
+          )}
+        </div>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+        <SaveStateIndicator
+          saveState={saveState}
+          saveErrorMessage={saveErrorMessage}
+        />
+
+        {scanStatusText && (
+          <span className="hidden max-w-72 flex-col items-end gap-1 xl:flex">
+            <span className="truncate text-xs font-medium text-muted-foreground">{scanStatusText}</span>
+            {scanProgressWidth && (
+              <span className="h-1 w-40 overflow-hidden rounded-full bg-muted">
+                <span
+                  className="block h-full rounded-full bg-primary transition-[width] duration-500"
+                  style={{
+                    width: scanProgressWidth,
+                  }}
+                />
+              </span>
+            )}
+          </span>
+        )}
+
+        {isScanButtonShown && (
+          <Button
+            size="sm"
+            variant={isScanning ? 'outline' : 'default'}
+            disabled={isScanButtonDisabled}
+            className={cn('rounded-full px-3.5 font-bold')}
+            onClick={onScanClick}
+          >
+            {isScanning && <Loader2Icon className="animate-spin" data-icon="inline-start" />}
+            {scanButtonLabel}
+          </Button>
+        )}
+
+        {actions}
+      </div>
+    </header>
+  );
+};

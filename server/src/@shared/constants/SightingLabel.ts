@@ -1,6 +1,6 @@
 /**
  * Automatic tags from the crossing decision, keyed by sighting label.
- * Mirror of AUTO_TAGS in viewer/app.js and tagCode in Scan.swift.
+ * Mirror of SightingAutoTags in web/src/@shared/constants/SightingLabel.ts and tagCode in Scan.swift.
  */
 export const SightingAutoTag: Record<string, { code: string; name: string }> = {
   'crossed': { code: '000', name: 'Crossed the mat' },

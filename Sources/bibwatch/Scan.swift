@@ -83,7 +83,7 @@ struct Detections: Codable {
 /// Set by SIGTERM (Cancel in the viewer): stop after the current frame and save.
 var scanStopRequested = false
 
-// MARK: - Decisions (mirrored in viewer/app.js → buildSightings / evaluate)
+// MARK: - Decisions (mirrored in web/src/@shared/utils/decideSightings.ts)
 
 struct Window { var bib: String; var from: Double; var to: Double; var count: Int; var seg: Segment }
 
@@ -459,7 +459,7 @@ func oneBibPerCrossing(_ input: [Sighting]) -> [Sighting] {
   return out
 }
 
-/// Numbered automatic tags (mirrored in viewer/app.js → AUTO_TAGS).
+/// Numbered automatic tags (mirrored in web/src/@shared/constants/SightingLabel.ts → SightingAutoTags).
 func tagCode(_ label: String) -> String {
   ["crossed": "000", "viewed": "001", "near-mat": "002", "passing": "003", "camera-moving": "004", "duplicate": "005"][label] ?? ""
 }

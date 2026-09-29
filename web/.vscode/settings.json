@@ -1,0 +1,14 @@
+{
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "editor.tabSize": 2,
+  "typescript.preferences.autoImportSpecifierExcludeRegexes": [
+    "@radix-ui",
+    "radix-ui",
+    "base-ui",
+    "@base-ui/react",
+    "next/dist",
+    "next/router",
+  ],
+}

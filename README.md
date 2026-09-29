@@ -11,8 +11,9 @@ saved and nothing is uploaded; the viewer opens the video straight from disk.
 ## Build
 
 ```bash
-swift build -c release        # binary: .build/release/bibwatch
-cd server && npm install      # the viewer's local server (NestJS, Node 22)
+swift build -c release                  # binary: .build/release/bibwatch
+cd web && npm install && npm run build  # the viewer (Next.js, static files in web/out)
+cd server && npm install                # the viewer's local server (NestJS, Node 22)
 ```
 
 ## Quick start (from the viewer)
@@ -20,7 +21,8 @@ cd server && npm install      # the viewer's local server (NestJS, Node 22)
 ```bash
 swift build -c release
 mkdir -p media && ln -s "/path/GX011760.MP4" media/     # videos (symlinks are fine)
-cp targets.txt media/                                  # optional: bib numbers to highlight
+cp targets.txt media/                                  # optional: bib numbers to watch
+(cd web && npm install && npm run build)               # the viewer
 cd server && npm install && npm run build
 MEDIA_FOLDER=../media npm run start:prod               # http://127.0.0.1:8765/
 ```
@@ -28,22 +30,22 @@ MEDIA_FOLDER=../media npm run start:prod               # http://127.0.0.1:8765/
 Or put `MEDIA_FOLDER` (and `PORT`) in `server/.env.development` / `.env.production`
 (see `server/.env.example`); `npm run dev` rebuilds and restarts on changes.
 
-1. Pick the video from **Library**.
-2. **Run scan** — progress is shown under the playback bar (finding camera positions →
-   reading bibs → following runners); results load by themselves when it's done.
-3. Mark the mat for each camera position where it's visible (**M**) — optional: without a
-   mat, bibs there are tagged **001 Viewed** instead of **000 Crossed the mat**; split camera positions if needed
-   (**S**), set the clock. Every change **re-syncs instantly**: crossings are
-   re-decided from the reads already made, no re-scan needed (**R** to re-sync by hand).
-4. If a change needs frames that were never read, those sightings show as `needs-scan` and **Run scan (update)** is highlighted —
-   it only reads the missing frames and adds them to what's there.
+1. Pick the video from the **Video** list at the top.
+2. **Run scan** (top right) — progress is shown next to it (finding camera positions →
+   reading bibs → following runners); runners appear in the list as they are found.
+3. **Mark finish line** for each camera position where it's visible (**M**) — optional: without a
+   finish line, bibs there are tagged **001 Viewed** instead of **000 Crossed the mat**; split camera positions if needed
+   (**S**), set the race clock. Every change applies **instantly**: finishes are
+   re-decided from the reads already made, no re-scan needed.
+4. If a change needs frames that were never read, those runners show *Not read here yet* —
+   **Scan again** only reads the missing frames and adds them to what's there.
 
 Reads accumulate per video in `media/scans/<video>/detections.json` (with the segments you
 sent in `segments.json`). Cancelling a scan discards that run's new reads.
 
 ### People only (experimental)
 
-Tick **people only** next to *Run scan* to find people first and read bibs only on their
+Tick **⋯ More › Only look for people (faster)** to find people first and read bibs only on their
 torsos: each torso is cut out, scaled to the same height (small, distant bibs get enlarged) and
 read in one picture, so banners, cones and signs are never read. On two hand-checked Chubb
 stretches it found 29 of 29 bibs (whole-frame reading: 27) in 11 % less time, but with a few
@@ -52,9 +54,9 @@ start. Command line: `scan … --people-first`; add `--profile` to see where the
 
 ## Search all videos
 
-**Search all videos** (side panel) finds a bib, or a tag, in every video of the media folder:
+**All videos** (above the runner list) finds a bib, or a tag, in every video of the media folder:
 type `147` (finds 0147) or `finisher`; click a result to open that video at that moment.
-Results are sorted by reader time, so set the clock (**Set clock…**) on each video to line up
+Results are sorted by reader time, so set the race clock (**Set…** on the video) on each video to line up
 the same runner across cameras. API: `GET /api/sightings?bib=147` or `?tag=finisher`.
 
 This comes from the server's SQLite database, `<media>/bibwatch.sqlite` (or
@@ -65,10 +67,20 @@ from before tags moved into the database.
 
 ## The viewer at a glance
 
-Under the video: play and step buttons, **Run scan** (with *people only*), **Set clock…** and
-**Mark mat**. Everything else is in **⋯ More** (top right): open files, split a camera
-position, export segments.json, clear scans, what to draw on the video, trackpad settings, and
-the keyboard shortcuts.
+The viewer is a Next.js app in `web/` (shadcn/ui + Tailwind, laid out and themed like
+`basekm-timing-engine-web`), built into static files that the server serves.
+
+- **Header**: the video list, how many runners were spotted, *Saved automatically*, the scan
+  status and **Run scan / Scan again / Stop scan**, and **⋯ More**.
+- **Video**: boxes and bib numbers drawn on top, the race clock (top left), play, ±1 s, speed.
+- **Timeline** (under the video): every runner as a marker, camera positions underneath;
+  Ctrl + scroll (or the slider) zooms, **Fit all** zooms out.
+- **Mark and annotate**: previous / next runner, **Mark finish line**, **Split camera position here**.
+- **Runners spotted** (right): All / Finished / Watchlist / Not yet finished, search, movement,
+  **CSV**, and **This video / All videos**. Select a runner to tag it.
+- **⋯ More**: open files, bib numbers and bib designs, race clock, split, download segments.json,
+  people-only scanning, what to draw on the video, trackpad settings, keyboard shortcuts, and
+  clear scans.
 
 ## Bib numbers (per event)
 
@@ -91,14 +103,14 @@ size and the bib-number range. With templates ticked, a scan first finds white d
 on that band colour (a few ms per frame) and only reads those areas, enlarged — so shirt
 logos, the "2026" in the bib logo, signage and other text are never read at all.
 
-In the viewer's **Bib templates** panel:
+In the viewer's **⋯ More › Bib designs…**:
 - **+ From design image** — the bib artwork (PNG/JPEG); give it a name and number range.
 - **+ From a bib in the video** — click the number of one clear bib (when you have no artwork).
 - **Calibrate** — click 3–5 clear bibs of that design in the footage (sunlit and shaded);
   it adjusts the colours and sizes to how they look on camera. Esc when done.
 - Tick every design used at the event (e.g. 5K pink and 1K teal) — several work together;
   each read is labelled with the design that found it.
-- **Show what the templates find** — dashed boxes on the paused frame, to check nothing
+- **Show what the designs find** — dashed boxes on the paused frame, to check nothing
   but bib numbers is picked up.
 
 Command line: `bibwatch template design.png t.json --name "5K" --max-bib 250`,
@@ -121,10 +133,10 @@ Every bib seen gets a **numbered tag** — the mat is optional:
 Plus detail on each sighting: **zone** (background / before-mat / on-mat / past-mat),
 **direction** (toward / away / still) and the **design** (template) it was read with.
 
-Your own tags start at **100**: select a sighting (in the list, or click its box on the video)
+Your own tags start at **100**: select a runner (in the list, on the timeline, or click its bib on the video)
 and press **1–4** — 100 finisher, 101 photo, 102 misread, 103 wrong bib — or type any tag;
 it gets the next free code (104, 105 …), remembered per video. Tags save per video
-(in the database, see *Search all videos*); filter the list by any tag; **CSV** exports every sighting with
+(in the database, see *Search all videos*); search the list by any tag; **CSV** exports every sighting with
 `tag_code`, `tag`, your tags and the detail.
 
 ## Workflow (command line)
@@ -143,12 +155,12 @@ separate camera positions, each with its own mat: bibs are captured the same eve
 
 Without a mat, bibs in that camera position are tagged **001 Viewed**; with one, the scan also
 decides who **crossed** it. Open the viewer (see below) with the video and `segments_*.json`.
-For each **fixed** segment where the mat is visible (green on the timeline, grey = no mat):
+For each camera position where the mat is visible (green on the timeline, blue = no finish line yet):
 
 1. Go to a moment where the mat is visible.
-2. Press **M** (or *Mark mat*) and click the two ends of the **near edge of the black mat**
+2. Press **M** (or *Mark finish line*) and click the two ends of the **near edge of the black mat**
    (the edge runners step onto first). It can be slanted.
-3. Mats are saved as you mark them; **⋯ More › Export segments.json** saves a copy.
+3. Finish lines are saved as you mark them; **⋯ More › Download a copy (segments.json)** saves a copy.
 
 The automatic split can be off by a few seconds, or miss a move. Correct it in the viewer:
 
@@ -200,14 +212,16 @@ crossing), `passing` (never near the mat), `no-person`, `unclear`, `no-mat`
 
 Load the video and `detections.json` in the viewer:
 
-- **Running clock**: video time + reader time on the video and in the side panel.
-- **Live boxes**: bibs (blue; green = crossed; red = target), people (thin white),
-  the mat line (yellow dashed), a banner when a runner crosses.
-- **List**: every sighting with label, video and reader time. Click to jump there.
-  Filters: all / crossed / targets / not crossed, and bib search.
-- **Scrubber** (QuickTime-style): drag anywhere and the picture follows; hover shows the
-  video and reader time; elapsed/remaining on either side. The bar also shows camera
-  positions (green = mat marked, grey = no mat) and crossing ticks.
+- **Race clock**: reader time on the video (top left), and next to each runner.
+- **Live boxes**: bib numbers (blue; green = finished; red = watchlist), people (thin white),
+  the finish line (yellow dashed), a banner when a runner finishes.
+- **Runners spotted**: every runner with video and reader time. Click to jump there.
+  Filters: all / finished / watchlist / not yet finished, movement, and bib or tag search.
+- **Scrubber** (on the video): drag anywhere and the picture follows; hover shows the
+  video and reader time.
+- **Timeline**: a marker per runner (green = finished, red = watchlist), camera positions
+  underneath (green = finish line marked), not-yet-scanned parts hatched. Click or drag to move
+  the playhead; Ctrl + scroll zooms.
 - **Trackpad / Magic Mouse**: swipe sideways over the video to scrub. **Swipe speed** (in **⋯ More**)
   slider sets how far a swipe goes (shown as seconds per typical swipe, from ≈0.3 s for
   frame-by-frame work to ≈30 s; default ≈1.5 s), **reverse** flips the direction; both are
@@ -215,19 +229,27 @@ Load the video and `detections.json` in the viewer:
   playhead like dragging it. The video pauses while you swipe and resumes after if it
   was playing; the browser's swipe-to-go-back is disabled on this page.
 - **Keys**: `Space` play/pause · `←/→` 0.1 s · `Shift+←/→` 1 s · `J`/`K`/`L` back 1 s /
-  pause / play (press `L` again for 2× and 4×) · `[`/`]` previous/next sighting · `M` mark mat.
+  pause / play (press `L` again for 2× and 4×) · `[`/`]` previous/next runner · `M` mark finish line ·
+  `S` split · `1`–`4` tag · `Esc` stop marking.
 
 ## Opening the viewer
 
-Either open `viewer/index.html` directly in Safari/Chrome and pick (or drag in) the video
-and JSON, or serve it locally (needed for `?video=&data=` links and the Run scan button):
+Build the viewer once (`cd web && npm run build`, into `web/out`), then start the server; it
+serves the viewer at `/`:
 
 ```bash
 cd server && MEDIA_FOLDER=../out/media npm run start:prod    # binds 127.0.0.1 only
 # http://127.0.0.1:8765/?video=/media/GX011759.MP4&data=/media/detections.json
 ```
 
-Put the video (a symlink is fine) and JSON in the `MEDIA_FOLDER`.
+Put the video (a symlink is fine) and JSON in the `MEDIA_FOLDER`. Without a media folder you
+can still drop a video and its JSON on the page (or **⋯ More › Open video file…**); nothing is
+uploaded.
+
+Working on the viewer: run the server as above, then `cd web && npm run dev` —
+http://localhost:3000 with hot reload; `/api` and `/media` are passed on to the server
+(`BIBWATCH_SERVER_URL`, default http://127.0.0.1:8765). The app follows
+`basekm-timing-engine-web` (structure, shadcn/ui primitives, theme); see `web/.agents/skills/`.
 
 The server (`server/`) is a NestJS app laid out like `basekm-timing-backend`: one module per
 area (`media`, `scans`, `templates`, `bibwatch` runs the Swift binary), DTOs and constants in

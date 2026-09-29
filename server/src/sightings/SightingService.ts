@@ -12,7 +12,7 @@ import { VideoEntity } from '../@shared/entities/VideoEntity';
 import { DatabaseWriter } from '../database/DatabaseWriter';
 import { VideoService } from '../videos/VideoService';
 
-/** How the viewer keys a sighting (sightingKey in app.js): bib@from, one decimal. */
+/** How the viewer keys a sighting (sightingKey in web/src/@shared/utils/sightingTags.ts): bib@from, one decimal. */
 export const sightingKeyOf = (sighting: { bib: string; from: number }) =>
   `${sighting.bib}@${sighting.from.toFixed(1)}`;
 
