@@ -44,6 +44,8 @@ struct ScanSettings: Codable, Equatable {
   var colorCheck: Bool
   /// Bib template in use (name + its measured values), nil = whole-frame reading.
   var template: String? = nil
+  /// "people-first": text is read only on the torsos of people found in the frame.
+  var reader: String? = nil
 }
 
 /// Everything the viewer needs, and everything a later scan can reuse.
@@ -197,13 +199,15 @@ func evaluate(_ w: Window, frames allFrames: [OverlayFrame], pad: Double, fineFp
 // MARK: - Scan
 
 func runScan(_ raw: [String]) {
-  let args = Args(raw, switches: ["no-color", "fresh"])
+  let args = Args(raw, switches: ["no-color", "fresh", "people-first", "profile"])
+  Profile.enabled = args.switches.contains("profile")
+  Profile.begin()
   guard args.positional.count >= 2 else {
     die("""
       usage: bibwatch scan <video> <outDir> [--targets targets.txt] [--segments segments.json | --mat X0,Y0,X1,Y1]
                            [--clock HH:MM:SS] [--every 0.5] [--fine-fps 10] [--pad 4] [--start mm:ss] [--end mm:ss]
                            [--max-bib 250] [--no-color] [--template template.json …] [--registered bibs.txt]
-                           [--from mm:ss] [--fresh] [--progress json]
+                           [--from mm:ss] [--fresh] [--people-first] [--profile] [--progress json]
 
       Frame reads are kept in <outDir>/detections.json and reused by later scans of the same
       video with the same settings, so re-running (e.g. after marking mats) only reads new frames.
@@ -219,7 +223,7 @@ func runScan(_ raw: [String]) {
   }.joined(separator: " | ")
   let settings = ScanSettings(every: args.double("every", 0.5), fineFps: args.double("fine-fps", 10), pad: args.double("pad", 4),
                               maxBib: templates.map(\.maxBib).max() ?? Int(args.double("max-bib", 250)), colorCheck: !args.switches.contains("no-color"),
-                              template: templateID)
+                              template: templateID, reader: args.switches.contains("people-first") ? "people-first" : nil)
   let clockSeconds = args.options["clock"].map(parseTime)
   let targets: Set<String> = args.options["targets"].map { path in
     Set((try? String(contentsOfFile: path, encoding: .utf8))?
@@ -306,7 +310,7 @@ func runScan(_ raw: [String]) {
                        frames: frames, sightings: sightings)
     d.scanning = final ? nil : true
     d.scannedUntil = final ? nil : (scannedUntil * 10).rounded() / 10
-    writeJSON(d, outPath)   // atomic: the viewer never sees a half-written file
+    timed("save") { writeJSON(d, outPath) }   // atomic: the viewer never sees a half-written file
     return sightings
   }
 
@@ -344,7 +348,8 @@ func runScan(_ raw: [String]) {
         if overlay[kk]?.people == nil {
           autoreleasepool {
             if let img = video.frame(at: Double(kk) / 1000) {
-              let r = readFrame(img, people: true, colorCheck: settings.colorCheck, maxBib: settings.maxBib, templates: templates)
+              let r = readFrame(img, people: true, colorCheck: settings.colorCheck, maxBib: settings.maxBib, templates: templates,
+                                peopleFirst: settings.reader == "people-first")
               rejected += r.rejectedByColor
               overlay[kk] = OverlayFrame(t: Double(kk) / 1000, bibs: r.bibs, people: r.people)
               fineRead += 1
@@ -364,7 +369,8 @@ func runScan(_ raw: [String]) {
       if scanStopRequested { break }
       autoreleasepool {
         guard let img = video.frame(at: t) else { return }
-        let r = readFrame(img, people: false, colorCheck: settings.colorCheck, maxBib: settings.maxBib, templates: templates)
+        let r = readFrame(img, people: false, colorCheck: settings.colorCheck, maxBib: settings.maxBib, templates: templates,
+                          peopleFirst: settings.reader == "people-first")
         rejected += r.rejectedByColor
         if !r.bibs.isEmpty, overlay[key(t)] == nil { overlay[key(t)] = OverlayFrame(t: t, bibs: r.bibs, people: nil) }
         for b in r.bibs where !(coarseHits[b.bib]?.contains(t) ?? false) { coarseHits[b.bib, default: []].append(t) }
@@ -420,6 +426,7 @@ func runScan(_ raw: [String]) {
     print("  \(s.bib) seen \(formatTime(s.from)): \(s.label)" + (s.cross.map { " at \(formatTime($0, tenths: true))" } ?? "") + (s.crossClock.map { " (\($0))" } ?? ""))
   }
   print("written: \(outPath), \(outDir)/crossings.csv")
+  Profile.report()
 }
 
 /// One crossing = one bib. When several sightings "cross" within a second of each other, they

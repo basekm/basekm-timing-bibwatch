@@ -98,6 +98,8 @@ function loadData(json) {
   state.crossedBibs = new Set(state.sightings.filter((s) => s.label === 'crossed').map((s) => s.bib));
   state.targets = new Set(d.targets || state.sightings.filter((s) => s.target).map((s) => s.bib));
   if (d.clock && state.clockOffset == null) state.clockOffset = parseClock(d.clock);
+  // Keep scanning the way this video's saved reads were made (a change means a fresh scan).
+  if (d.settings) $('peopleFirst').checked = d.settings.reader === 'people-first';
   // Scans from the accumulating scanner carry the raw reads: decide crossings here, so the
   // current mats and segment edits always apply.
   if (d.coarseHits) resync(false);
@@ -931,7 +933,12 @@ $('runScan').addEventListener('click', async () => {
     clock: state.clockOffset != null ? fmt(state.clockOffset) : null,
     templates: [...state.useTemplates].filter((id) => state.templates.some((t) => t.id === id)),
     from: +video.currentTime.toFixed(1),   // start where you are; wraps round to the beginning
+    peopleFirst: $('peopleFirst').checked,
   };
+  const madeWith = state.data?.settings ? (state.data.settings.reader === 'people-first') : null;
+  if (madeWith != null && madeWith !== body.peopleFirst && !(await uiConfirm(
+    `This video's saved scan was made ${madeWith ? 'with' : 'without'} "people only". Scanning ${body.peopleFirst ? 'with' : 'without'} it reads the whole video again from the start.`,
+    'Scan again'))) return;
   try {
     await api('/api/scan', body); followScan();
   } catch (e) { uiAlert(`Could not start the scan: ${e.message}`); }

@@ -41,6 +41,15 @@ Or put `MEDIA_FOLDER` (and `PORT`) in `server/.env.development` / `.env.producti
 Reads accumulate per video in `media/scans/<video>/detections.json` (with the segments you
 sent in `segments.json`). Cancelling a scan discards that run's new reads.
 
+### People only (experimental)
+
+Tick **people only** next to *Run scan* to find people first and read bibs only on their
+torsos: each torso is cut out, scaled to the same height (small, distant bibs get enlarged) and
+read in one picture, so banners, cones and signs are never read. On two hand-checked Chubb
+stretches it found 29 of 29 bibs (whole-frame reading: 27) in 11 % less time, but with a few
+more one-digit slips (e.g. 5164 for 5161). Changing the box scans the video again from the
+start. Command line: `scan … --people-first`; add `--profile` to see where the time goes.
+
 ## Search all videos
 
 **Search all videos** (side panel) finds a bib, or a tag, in every video of the media folder:

@@ -77,6 +77,7 @@ export class ScanService {
       registeredPath,
       templatePaths,
       maxBib: await this.maxBibOf(registeredPath),
+      peopleFirst: Boolean(body.peopleFirst),
       startAt: body.from ?? null,
     });
     void run.then(() => this.sightingImportService.importDetections(body.video)).catch(() => undefined);

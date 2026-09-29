@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsNotEmpty, IsNumber, IsObject, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsBoolean, IsNotEmpty, IsNumber, IsObject, IsOptional, IsString } from 'class-validator';
 
 export class ScanStartRequestDto {
   @IsNotEmpty()
@@ -27,6 +27,11 @@ export class ScanStartRequestDto {
   @Type(() => Number)
   @IsNumber()
   from: number | null;
+
+  /** Experimental: read bibs only on the torsos of people found in the frame (`--people-first`). */
+  @IsOptional()
+  @IsBoolean()
+  peopleFirst: boolean;
 
   constructor(obj?: Partial<ScanStartRequestDto>) {
     Object.assign(this, obj);

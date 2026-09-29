@@ -21,7 +21,7 @@ final class VideoSource {
   }
 
   func frame(at t: Double) -> CGImage? {
-    try? generator.copyCGImage(at: CMTime(seconds: t, preferredTimescale: 600), actualTime: nil)
+    timed("decode") { try? generator.copyCGImage(at: CMTime(seconds: t, preferredTimescale: 600), actualTime: nil) }
   }
 }
 
@@ -145,18 +145,23 @@ struct FrameReads {
   var rejectedByColor: Int
 }
 
-func readFrame(_ image: CGImage, people wantPeople: Bool, colorCheck: Bool, maxBib: Int, templates: [BibTemplate] = []) -> FrameReads {
+func readFrame(_ image: CGImage, people wantPeople: Bool, colorCheck: Bool, maxBib: Int, templates: [BibTemplate] = [],
+               peopleFirst: Bool = false) -> FrameReads {
+  if peopleFirst {
+    return readPeopleFirst(image, people: wantPeople, maxBib: maxBib)
+  }
   // Template mode: find number areas by each bib design's colours first, read only those.
   if !templates.isEmpty {
     var people: [Box] = []
     if wantPeople {
       let humans = VNDetectHumanRectanglesRequest()
       humans.upperBodyOnly = false
-      try? VNImageRequestHandler(cgImage: image, options: [:]).perform([humans])
+      timed("humans") { try? VNImageRequestHandler(cgImage: image, options: [:]).perform([humans]) }
       people = (humans.results ?? []).map { Box(visionRect: $0.boundingBox) }
     }
-    guard let px = Pixels(image) else { return FrameReads(bibs: [], people: people, rejectedByColor: 0) }
-    return FrameReads(bibs: readCandidates(image, findAllCandidates(px, templates)), people: people, rejectedByColor: 0)
+    guard let px = timed("pixels", { Pixels(image) }) else { return FrameReads(bibs: [], people: people, rejectedByColor: 0) }
+    let candidates = timed("finder") { findAllCandidates(px, templates) }
+    return FrameReads(bibs: timed("read") { readCandidates(image, candidates) }, people: people, rejectedByColor: 0)
   }
   let text = VNRecognizeTextRequest()
   text.recognitionLevel = .accurate
@@ -164,7 +169,7 @@ func readFrame(_ image: CGImage, people wantPeople: Bool, colorCheck: Bool, maxB
   text.minimumTextHeight = 0.015
   let humans = VNDetectHumanRectanglesRequest()
   humans.upperBodyOnly = false
-  try? VNImageRequestHandler(cgImage: image, options: [:]).perform(wantPeople ? [text, humans] : [text])
+  timed("text") { try? VNImageRequestHandler(cgImage: image, options: [:]).perform(wantPeople ? [text, humans] : [text]) }
 
   var bibs: [BibRead] = []
   var rejected = 0
@@ -186,3 +191,99 @@ func readFrame(_ image: CGImage, people wantPeople: Bool, colorCheck: Bool, maxB
   let people = wantPeople ? (humans.results ?? []).map { Box(visionRect: $0.boundingBox) } : []
   return FrameReads(bibs: bibs, people: people, rejectedByColor: rejected)
 }
+
+// MARK: - Person-first reading
+
+/// Where a bib is pinned, as a part of a person's box: the torso — chest to belly, the body's
+/// width plus a little either side (bibs sit off-centre, arms swing over them).
+// Tuned on two hand-checked Chubb stretches (GX021737 2:30–3:00, Chubb - Trimmed.mp4): 29/29 bibs.
+/// Part of a person's height searched for a bib: 10–90 % catches bibs pinned low and people
+/// cut off by the frame edge; the whole person (0–100 %) makes the bib smaller in the tile.
+let torsoRange: (top: Double, bottom: Double) = (0.10, 0.90)
+/// Height every torso is scaled to in the mosaic: far bibs get enlarged, near ones shrunk.
+let mosaicTileHeight = 480.0
+
+func torsoRegion(of person: Box) -> Box {
+  let w = person.x1 - person.x0, h = person.y1 - person.y0
+  return Box(x0: max(0, person.x0 - w * 0.1), y0: max(0, person.y0 + h * torsoRange.top),
+             x1: min(1, person.x1 + w * 0.1), y1: min(1, person.y0 + h * torsoRange.bottom))
+}
+
+/// Person-first: find the people, then read text only on their torsos. Signage, banners and
+/// cones are never read, and text recognition works on a fraction of the frame.
+func readPeopleFirst(_ image: CGImage, people wantPeople: Bool, maxBib: Int) -> FrameReads {
+  let humans = VNDetectHumanRectanglesRequest()
+  humans.upperBodyOnly = false
+  timed("humans") { try? VNImageRequestHandler(cgImage: image, options: [:]).perform([humans]) }
+  let people = (humans.results ?? []).map { Box(visionRect: $0.boundingBox) }
+
+  // Too small to hold a readable bib: skip (people far down the road).
+  let frameH = Double(image.height), frameW = Double(image.width)
+  let regions = people.map(torsoRegion).filter { ($0.y1 - $0.y0) * frameH >= 28 && ($0.x1 - $0.x0) * frameW >= 16 }
+
+  let reads = timed("text") { readRegionsMosaic(image, regions, maxBib: maxBib, tileHeight: mosaicTileHeight) }
+  return FrameReads(bibs: reads, people: wantPeople ? people : [], rejectedByColor: 0)
+}
+
+/// Reads text in several regions of a frame with one text-recognition call: each region is cut
+/// out, scaled to the same height (far-away bibs get enlarged, close ones shrunk) and tiled into
+/// one small picture. Boxes are mapped back to frame coordinates. One read per bib per frame.
+func readRegionsMosaic(_ image: CGImage, _ regions: [Box], maxBib: Int, tileHeight: Double = 240, maxWidth: Double = 1600) -> [BibRead] {
+  guard !regions.isEmpty else { return [] }
+  let gap = 16.0
+  let fw = Double(image.width), fh = Double(image.height)
+  // Lay the tiles out in rows (top-down layout coordinates).
+  var tiles: [(region: Box, crop: CGRect, rect: CGRect)] = []
+  var x = gap, y = gap, rowBottom = gap
+  for r in regions {
+    let crop = CGRect(x: r.x0 * fw, y: r.y0 * fh, width: (r.x1 - r.x0) * fw, height: (r.y1 - r.y0) * fh).integral
+    guard crop.width > 2, crop.height > 2 else { continue }
+    let scale = tileHeight / crop.height
+    let w = min(crop.width * scale, maxWidth - 2 * gap)
+    if x + w > maxWidth - gap, x > gap { x = gap; y = rowBottom + gap }
+    tiles.append((r, crop, CGRect(x: x, y: y, width: w, height: tileHeight)))
+    x += w + gap
+    rowBottom = max(rowBottom, y + tileHeight)
+  }
+  guard !tiles.isEmpty else { return [] }
+  let W = Int(tiles.map { $0.rect.maxX }.max()! + gap), H = Int(rowBottom + gap)
+  guard let ctx = CGContext(data: nil, width: W, height: H, bitsPerComponent: 8, bytesPerRow: 0,
+                            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return [] }
+  ctx.setFillColor(CGColor(gray: 0, alpha: 1))
+  ctx.fill(CGRect(x: 0, y: 0, width: W, height: H))
+  ctx.interpolationQuality = .high
+  for t in tiles {
+    guard let cut = image.cropping(to: t.crop) else { continue }
+    // CoreGraphics origin is bottom-left.
+    ctx.draw(cut, in: CGRect(x: t.rect.minX, y: Double(H) - t.rect.maxY, width: t.rect.width, height: t.rect.height))
+  }
+  guard let mosaic = ctx.makeImage() else { return [] }
+
+  let req = VNRecognizeTextRequest()
+  req.recognitionLevel = .accurate
+  req.usesLanguageCorrection = false
+  req.minimumTextHeight = Float(tileHeight * 0.06 / Double(H))   // digits are ≥ ~6 % of a torso's height
+  try? VNImageRequestHandler(cgImage: mosaic, options: [:]).perform([req])
+
+  var best: [String: BibRead] = [:]
+  for obs in req.results ?? [] {
+    // Vision boxes are normalised with a bottom-left origin; tile rects are top-down.
+    let bb = obs.boundingBox
+    let mx0 = bb.minX * Double(W), mx1 = bb.maxX * Double(W)
+    let my0 = (1 - bb.maxY) * Double(H), my1 = (1 - bb.minY) * Double(H)
+    guard let t = tiles.first(where: { $0.rect.contains(CGPoint(x: (mx0 + mx1) / 2, y: (my0 + my1) / 2)) }) else { continue }
+    func frameX(_ v: Double) -> Double { (t.crop.minX + (v - t.rect.minX) / t.rect.width * t.crop.width) / fw }
+    func frameY(_ v: Double) -> Double { (t.crop.minY + (v - t.rect.minY) / t.rect.height * t.crop.height) / fh }
+    let box = Box(x0: frameX(mx0), y0: frameY(my0), x1: frameX(mx1), y1: frameY(my1))
+    var seen = Set<String>()
+    for cand in obs.topCandidates(3) {
+      for (bib, fragment) in BibText.numbers(cand.string, maxBib: maxBib) where !seen.contains(bib) {
+        seen.insert(bib)
+        let read = BibRead(bib: bib, box: box, confidence: Double(cand.confidence), fragment: fragment ? true : nil)
+        if best[bib].map({ $0.confidence < read.confidence }) ?? true { best[bib] = read }
+      }
+    }
+  }
+  return Array(best.values)
+}
+
