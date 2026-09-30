@@ -26,6 +26,7 @@ export class BibReadDto extends AppBaseDto {
   confidence: number;
   fragment?: boolean;
   template?: string | null;
+  manual?: boolean;
 }
 
 export class DetectionFrameDto extends AppBaseDto {
@@ -51,6 +52,7 @@ export class SightingDto extends AppBaseDto {
   fullReads?: number;
   tracked?: number;
   coarseFrames?: number;
+  manual?: boolean;
 }
 
 export class ScanSettingsDto extends AppBaseDto {

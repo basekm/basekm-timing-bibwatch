@@ -37,8 +37,6 @@ export class VideoPlaybackController {
 
   swipeSpeed = 35;
 
-  isSwipeReversed = false;
-
   private pendingSeek: PendingSeek | null = null;
 
   private isDragging = false;
@@ -57,13 +55,10 @@ export class VideoPlaybackController {
 
   setSwipeSettings({
     speed,
-    isReversed,
   }: {
     speed: number;
-    isReversed: boolean;
   }) {
     this.swipeSpeed = speed;
-    this.isSwipeReversed = isReversed;
   }
 
   setFallbackDuration(duration: number) {
@@ -252,10 +247,6 @@ export class VideoPlaybackController {
       this.swipe.target = isContinuing ? this.swipe.target : (this.previewTime ?? this.video.currentTime);
       this.video.pause();
       this.notify();
-    }
-
-    if (this.isSwipeReversed) {
-      horizontalDelta = -horizontalDelta;
     }
 
     const boost = event.altKey ? 10 : 1;

@@ -4,7 +4,8 @@ import {
   MouseEvent,
   RefObject,
   useEffect,
-  useRef
+  useRef,
+  useState
 } from 'react';
 
 import {
@@ -28,7 +29,8 @@ type VideoOverlayCanvasProps = {
   sceneRef: RefObject<OverlayScene>;
   isOverlayShown: boolean;
   isPicking: boolean;
-  onFrameClick: (point: FramePoint) => void;
+  onFrameClick: (point: FramePoint | null) => void;
+  isClickableAt: (point: FramePoint) => boolean;
 };
 
 export const VideoOverlayCanvas = ({
@@ -37,8 +39,10 @@ export const VideoOverlayCanvas = ({
   isOverlayShown,
   isPicking,
   onFrameClick,
+  isClickableAt,
 }: VideoOverlayCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isOverClickable, setIsOverClickable] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -90,10 +94,10 @@ export const VideoOverlayCanvas = ({
     };
   }, [controller, isOverlayShown, sceneRef]);
 
-  const handleClick = (event: MouseEvent<HTMLCanvasElement>) => {
+  const framePointOf = (event: MouseEvent<HTMLCanvasElement>): FramePoint | null => {
     const canvas = canvasRef.current;
     if (!canvas) {
-      return;
+      return null;
     }
 
     const rect = contentRectOf({
@@ -106,20 +110,31 @@ export const VideoOverlayCanvas = ({
     const isInsidePicture = x >= 0 && x <= 1 && y >= 0 && y <= 1;
 
     if (!isInsidePicture) {
-      return;
+      return null;
     }
 
-    onFrameClick({
+    return {
       x: Number(x.toFixed(4)),
       y: Number(y.toFixed(4)),
-    });
+    };
+  };
+
+  const handleClick = (event: MouseEvent<HTMLCanvasElement>) => {
+    onFrameClick(framePointOf(event));
+  };
+
+  const handleMouseMove = (event: MouseEvent<HTMLCanvasElement>) => {
+    const point = framePointOf(event);
+    setIsOverClickable(point !== null && isClickableAt(point));
   };
 
   return (
     <canvas
       ref={canvasRef}
-      className={cn('absolute inset-0 size-full', isPicking && 'cursor-crosshair')}
+      className={cn('absolute inset-0 size-full', isOverClickable && 'cursor-pointer', isPicking && 'cursor-crosshair')}
       onClick={handleClick}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={() => setIsOverClickable(false)}
     />
   );
 };

@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  FileJsonIcon,
   FilmIcon,
   UploadIcon
 } from 'lucide-react';
@@ -22,7 +21,6 @@ type EmptyViewerStateProps = {
   isServerAvailable: boolean;
   onSelectVideo: (name: string) => void;
   onOpenVideoFile: () => void;
-  onImportResults: () => void;
 };
 
 export const EmptyViewerState = ({
@@ -30,7 +28,6 @@ export const EmptyViewerState = ({
   isServerAvailable,
   onSelectVideo,
   onOpenVideoFile,
-  onImportResults,
 }: EmptyViewerStateProps) => {
   return (
     <Card className="flex aspect-video items-center justify-center border-2 border-dashed bg-card/60 p-6 shadow-none ring-0">
@@ -42,7 +39,7 @@ export const EmptyViewerState = ({
         <div className="flex flex-col gap-1.5">
           <h2 className="text-base font-bold">Open a race video</h2>
           <p className="text-sm text-muted-foreground">
-            Drop a video and its detections.json (or segments.json) anywhere on this page. Files stay on this computer.
+            Drop a video anywhere on this page. It stays on this computer.
           </p>
         </div>
 
@@ -70,13 +67,6 @@ export const EmptyViewerState = ({
           >
             <FilmIcon data-icon="inline-start" />
             Open video file…
-          </Button>
-          <Button
-            variant="outline"
-            onClick={onImportResults}
-          >
-            <FileJsonIcon data-icon="inline-start" />
-            Import saved results…
           </Button>
         </div>
       </div>

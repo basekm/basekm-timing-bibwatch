@@ -297,7 +297,6 @@ export const RaceTimelineCard = ({
             variant="outline"
             size="icon-sm"
             aria-label="Zoom out"
-            className="rounded-full"
             disabled={zoom <= 1}
             onClick={() => zoomAroundPlayhead(zoom / 1.5)}
           >
@@ -317,7 +316,6 @@ export const RaceTimelineCard = ({
             variant="outline"
             size="icon-sm"
             aria-label="Zoom in"
-            className="rounded-full"
             disabled={zoom >= maxZoom}
             onClick={() => zoomAroundPlayhead(zoom * 1.5)}
           >

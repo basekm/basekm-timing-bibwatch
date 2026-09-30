@@ -41,6 +41,9 @@ export class ScanService {
       throw new InternalServerErrorException({ error: 'scanner not built — run: swift build -c release' });
     }
     const videoPath = await this.mediaService.resolveVideo(body.video);
+    if (body.peopleFirst && body.templates?.length) {
+      throw new BadRequestException({ error: '"Only look for people" and bib designs are two ways of reading — untick one' });
+    }
 
     // Checked and set with no `await` in between, so two clicks can't start two scans.
     if (this.job?.isRunning) {

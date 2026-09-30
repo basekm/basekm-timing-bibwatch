@@ -121,13 +121,18 @@ enum BibText {
 
   static func candidates(_ text: String, maxBib: Int) -> [String] { numbers(text, maxBib: maxBib).map(\.bib) }
 
-  /// Numbers in the text, with whether each was only a fragment.
+  /// Numbers in the text, with whether each was only a fragment. Letters that look like digits
+  /// count as digits ("5O19"), but not in a word ("CHUBB" is not 188) and not when they make up
+  /// half the number or more ("IBB").
   static func numbers(_ text: String, maxBib: Int) -> [(bib: String, fragment: Bool)] {
-    let fixed = String(text.map { letterFix[$0] ?? $0 })
     let lo = min(minBib, maxBib)
-    var out: [(String, Bool)] = [], run = ""
-    for ch in fixed + " " {
+    var out: [(String, Bool)] = [], run = "", fixedLetters = 0, afterWord = false
+    for ch in text + " " {
       if ch.isNumber { run.append(ch); continue }
+      if let d = letterFix[ch] { run.append(d); fixedLetters += 1; continue }
+      defer { run = ""; fixedLetters = 0; afterWord = ch.isLetter }
+      let inWord = afterWord || ch.isLetter
+      if fixedLetters > 0, inWord || fixedLetters * 2 >= run.count { continue }
       if let n = Int(run) {
         if (minDigits...maxDigits).contains(run.count), (lo...maxBib).contains(n) {
           out.append((run, false))
@@ -135,7 +140,6 @@ enum BibText {
           out.append((isClassic ? String(format: "%04d", n) : run, true))
         }
       }
-      run = ""
     }
     return out
   }
@@ -224,13 +228,19 @@ func readFrame(_ image: CGImage, people wantPeople: Bool, colorCheck: Bool, maxB
 /// Part of a person's height searched for a bib: 10–90 % catches bibs pinned low and people
 /// cut off by the frame edge; the whole person (0–100 %) makes the bib smaller in the tile.
 let torsoRange: (top: Double, bottom: Double) = (0.10, 0.90)
+/// Added either side of a person's width, as a part of it: bibs pinned off-centre or turned
+/// sideways stick out of the person box. Measured on bench/: 0.2 and 0.3 read more of the
+/// neighbours' bibs and list fewer right numbers.
+let torsoSidePad = 0.10
 /// Height every torso is scaled to in the mosaic: far bibs get enlarged, near ones shrunk.
+/// Measured on bench/: 360 and 240 are faster but miss runners; capping the enlargement of far
+/// people or a larger minimum text height didn't make it faster.
 let mosaicTileHeight = 480.0
 
 func torsoRegion(of person: Box) -> Box {
   let w = person.x1 - person.x0, h = person.y1 - person.y0
-  return Box(x0: max(0, person.x0 - w * 0.1), y0: max(0, person.y0 + h * torsoRange.top),
-             x1: min(1, person.x1 + w * 0.1), y1: min(1, person.y0 + h * torsoRange.bottom))
+  return Box(x0: max(0, person.x0 - w * torsoSidePad), y0: max(0, person.y0 + h * torsoRange.top),
+             x1: min(1, person.x1 + w * torsoSidePad), y1: min(1, person.y0 + h * torsoRange.bottom))
 }
 
 /// Person-first: find the people, then read text only on their torsos. Signage, banners and
@@ -240,24 +250,31 @@ func readPeopleFirst(_ image: CGImage, people wantPeople: Bool, maxBib: Int) -> 
   humans.upperBodyOnly = false
   timed("humans") { try? VNImageRequestHandler(cgImage: image, options: [:]).perform([humans]) }
   let people = (humans.results ?? []).map { Box(visionRect: $0.boundingBox) }
-
-  // Too small to hold a readable bib: skip (people far down the road).
-  let frameH = Double(image.height), frameW = Double(image.width)
-  let regions = people.map(torsoRegion).filter { ($0.y1 - $0.y0) * frameH >= 28 && ($0.x1 - $0.x0) * frameW >= 16 }
-
-  let reads = timed("text") { readRegionsMosaic(image, regions, maxBib: maxBib, tileHeight: mosaicTileHeight) }
+  let reads = timed("text") { readRegionsMosaic(image, torsoRegions(image, people), maxBib: maxBib, tileHeight: mosaicTileHeight) }
   return FrameReads(bibs: reads, people: wantPeople ? people : [], rejectedByColor: 0)
 }
 
-/// Reads text in several regions of a frame with one text-recognition call: each region is cut
-/// out, scaled to the same height (far-away bibs get enlarged, close ones shrunk) and tiled into
-/// one small picture. Boxes are mapped back to frame coordinates. One read per bib per frame.
-func readRegionsMosaic(_ image: CGImage, _ regions: [Box], maxBib: Int, tileHeight: Double = 240, maxWidth: Double = 1600) -> [BibRead] {
-  guard !regions.isEmpty else { return [] }
+/// The torsos worth reading: people too small to hold a readable bib (far down the road) are skipped.
+func torsoRegions(_ image: CGImage, _ people: [Box]) -> [Box] {
+  let frameH = Double(image.height), frameW = Double(image.width)
+  return people.map(torsoRegion).filter { ($0.y1 - $0.y0) * frameH >= 28 && ($0.x1 - $0.x0) * frameW >= 16 }
+}
+
+/// Several regions of a frame cut out, scaled to the same height (far-away bibs get enlarged,
+/// close ones shrunk) and tiled into one small picture, so one text-recognition call reads them all.
+struct Mosaic {
+  let image: CGImage
+  /// Each region's crop in frame pixels and where it sits in the mosaic (top-down pixels).
+  let tiles: [(crop: CGRect, rect: CGRect)]
+  let tileHeight: Double
+}
+
+func makeMosaic(_ image: CGImage, _ regions: [Box], tileHeight: Double = 240, maxWidth: Double = 1600) -> Mosaic? {
+  guard !regions.isEmpty else { return nil }
   let gap = 16.0
   let fw = Double(image.width), fh = Double(image.height)
   // Lay the tiles out in rows (top-down layout coordinates).
-  var tiles: [(region: Box, crop: CGRect, rect: CGRect)] = []
+  var tiles: [(crop: CGRect, rect: CGRect)] = []
   var x = gap, y = gap, rowBottom = gap
   for r in regions {
     let crop = CGRect(x: r.x0 * fw, y: r.y0 * fh, width: (r.x1 - r.x0) * fw, height: (r.y1 - r.y0) * fh).integral
@@ -265,14 +282,14 @@ func readRegionsMosaic(_ image: CGImage, _ regions: [Box], maxBib: Int, tileHeig
     let scale = tileHeight / crop.height
     let w = min(crop.width * scale, maxWidth - 2 * gap)
     if x + w > maxWidth - gap, x > gap { x = gap; y = rowBottom + gap }
-    tiles.append((r, crop, CGRect(x: x, y: y, width: w, height: tileHeight)))
+    tiles.append((crop, CGRect(x: x, y: y, width: w, height: tileHeight)))
     x += w + gap
     rowBottom = max(rowBottom, y + tileHeight)
   }
-  guard !tiles.isEmpty else { return [] }
+  guard !tiles.isEmpty else { return nil }
   let W = Int(tiles.map { $0.rect.maxX }.max()! + gap), H = Int(rowBottom + gap)
   guard let ctx = CGContext(data: nil, width: W, height: H, bitsPerComponent: 8, bytesPerRow: 0,
-                            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return [] }
+                            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
   ctx.setFillColor(CGColor(gray: 0, alpha: 1))
   ctx.fill(CGRect(x: 0, y: 0, width: W, height: H))
   ctx.interpolationQuality = .high
@@ -281,33 +298,49 @@ func readRegionsMosaic(_ image: CGImage, _ regions: [Box], maxBib: Int, tileHeig
     // CoreGraphics origin is bottom-left.
     ctx.draw(cut, in: CGRect(x: t.rect.minX, y: Double(H) - t.rect.maxY, width: t.rect.width, height: t.rect.height))
   }
-  guard let mosaic = ctx.makeImage() else { return [] }
+  guard let mosaic = ctx.makeImage() else { return nil }
+  return Mosaic(image: mosaic, tiles: tiles, tileHeight: tileHeight)
+}
 
+/// Every number read in a mosaic, with its box in frame fractions and in the mosaic (top-down
+/// pixels). A number may appear more than once (several candidates, several tiles).
+func readMosaic(_ m: Mosaic, frameWidth fw: Double, frameHeight fh: Double, maxBib: Int) -> [(read: BibRead, inMosaic: CGRect)] {
+  let W = Double(m.image.width), H = Double(m.image.height)
   let req = VNRecognizeTextRequest()
   req.recognitionLevel = .accurate
   req.usesLanguageCorrection = false
-  req.minimumTextHeight = Float(tileHeight * 0.06 / Double(H))   // digits are ≥ ~6 % of a torso's height
-  try? VNImageRequestHandler(cgImage: mosaic, options: [:]).perform([req])
+  req.minimumTextHeight = Float(m.tileHeight * 0.06 / H)   // digits are ≥ ~6 % of a torso's height
+  try? VNImageRequestHandler(cgImage: m.image, options: [:]).perform([req])
 
-  var best: [String: BibRead] = [:]
+  var out: [(read: BibRead, inMosaic: CGRect)] = []
   for obs in req.results ?? [] {
     // Vision boxes are normalised with a bottom-left origin; tile rects are top-down.
     let bb = obs.boundingBox
-    let mx0 = bb.minX * Double(W), mx1 = bb.maxX * Double(W)
-    let my0 = (1 - bb.maxY) * Double(H), my1 = (1 - bb.minY) * Double(H)
-    guard let t = tiles.first(where: { $0.rect.contains(CGPoint(x: (mx0 + mx1) / 2, y: (my0 + my1) / 2)) }) else { continue }
+    let mx0 = bb.minX * W, mx1 = bb.maxX * W
+    let my0 = (1 - bb.maxY) * H, my1 = (1 - bb.minY) * H
+    guard let t = m.tiles.first(where: { $0.rect.contains(CGPoint(x: (mx0 + mx1) / 2, y: (my0 + my1) / 2)) }) else { continue }
     func frameX(_ v: Double) -> Double { (t.crop.minX + (v - t.rect.minX) / t.rect.width * t.crop.width) / fw }
     func frameY(_ v: Double) -> Double { (t.crop.minY + (v - t.rect.minY) / t.rect.height * t.crop.height) / fh }
     let box = Box(x0: frameX(mx0), y0: frameY(my0), x1: frameX(mx1), y1: frameY(my1))
+    let inMosaic = CGRect(x: mx0, y: my0, width: mx1 - mx0, height: my1 - my0)
     var seen = Set<String>()
     for cand in obs.topCandidates(3) {
       for (bib, fragment) in BibText.numbers(cand.string, maxBib: maxBib) where !seen.contains(bib) {
         seen.insert(bib)
-        let read = BibRead(bib: bib, box: box, confidence: Double(cand.confidence), fragment: fragment ? true : nil)
-        if best[bib].map({ $0.confidence < read.confidence }) ?? true { best[bib] = read }
+        out.append((BibRead(bib: bib, box: box, confidence: Double(cand.confidence), fragment: fragment ? true : nil), inMosaic))
       }
     }
   }
-  return Array(best.values)
+  return out
 }
 
+/// Reads text in several regions of a frame with one text-recognition call (see `Mosaic`).
+/// Boxes are mapped back to frame coordinates. One read per bib per frame.
+func readRegionsMosaic(_ image: CGImage, _ regions: [Box], maxBib: Int, tileHeight: Double = 240, maxWidth: Double = 1600) -> [BibRead] {
+  guard let m = makeMosaic(image, regions, tileHeight: tileHeight, maxWidth: maxWidth) else { return [] }
+  var best: [String: BibRead] = [:]
+  for (read, _) in readMosaic(m, frameWidth: Double(image.width), frameHeight: Double(image.height), maxBib: maxBib) {
+    if best[read.bib].map({ $0.confidence < read.confidence }) ?? true { best[read.bib] = read }
+  }
+  return Array(best.values)
+}

@@ -36,6 +36,7 @@ type BibDesignsDialogProps = {
   isOpen: boolean;
   templates: TemplateGetResponseDto[];
   templateIdsInUse: string[];
+  isPeopleFirst: boolean;
   isFinderShown: boolean;
   onOpenChange: (isOpen: boolean) => void;
   onTemplateInUseChange: (params: { templateId: string; isInUse: boolean }) => void;
@@ -58,6 +59,7 @@ export const BibDesignsDialog = ({
   isOpen,
   templates,
   templateIdsInUse,
+  isPeopleFirst,
   isFinderShown,
   onOpenChange,
   onTemplateInUseChange,
@@ -88,6 +90,7 @@ export const BibDesignsDialog = ({
           <DialogTitle>Bib designs</DialogTitle>
           <DialogDescription>
             With designs ticked, a scan only reads numbers on those bibs — faster and far less noise from shirts and signs. Not needed for most races.
+            {isPeopleFirst && ' While a design is ticked, “Only look for people” is off: the designs choose where to read.'}
           </DialogDescription>
         </DialogHeader>
 

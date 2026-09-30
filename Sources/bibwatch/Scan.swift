@@ -221,6 +221,9 @@ func runScan(_ raw: [String]) {
   let videoPath = args.positional[0], outDir = args.positional[1]
   progressJSON = args.options["progress"] == "json"
   let templates: [BibTemplate] = (args.all["template"] ?? []).map { readJSON(BibTemplate.self, $0) }
+  if !templates.isEmpty && args.switches.contains("people-first") {
+    die("--people-first and --template are two different ways of reading: people-first reads the torsos of the people found, templates look for the bib colours across the frame. Pick one.")
+  }
   let templateID = templates.isEmpty ? nil : templates.map { t in
     String(format: "%@ h%.1f±%.0f s%.2f v%.2f w%.2f/%.2f d%.4f-%.4f r%d-%d", t.name, t.bandHue, t.hueTolerance, t.bandSatMin, t.bandValMin,
            t.digitSatMax, t.digitValMin, t.digitHeightMin, t.digitHeightMax, t.minBib ?? 1, t.maxBib)
@@ -304,11 +307,12 @@ func runScan(_ raw: [String]) {
       var f = f; f.t = (f.t * 1000).rounded() / 1000; return f
     }
     let hits = coarseHits.mapValues { Array(Set($0.map { ($0 * 1000).rounded() / 1000 })).sorted() }
-    let sightings = oneBibPerCrossing(buildWindows(hits, segments: segments).map { w -> Sighting in
+    let evaluated = buildWindows(hits, segments: segments).map { w -> Sighting in
       var s = evaluate(w, frames: frames, pad: pad, fineFps: settings.fineFps, target: targets.contains(w.bib), clock: clockSeconds)
       s.registered = registered.map { $0.contains(w.bib) }
       return s
-    })
+    }
+    let sightings = foldMisreads(dropFragmentOnly(evaluated, frames: frames, pad: pad), frames: frames, segments: segments, pad: pad)
     var d = Detections(video: video.url.lastPathComponent, duration: video.duration,
                        clock: clockSeconds.map { formatTime($0, tenths: true) }, maxBib: settings.maxBib,
                        colorCheck: settings.colorCheck, settings: settings, coarseDone: mergeRanges(coarseDone),
@@ -435,28 +439,100 @@ func runScan(_ raw: [String]) {
   Profile.report()
 }
 
-/// One crossing = one bib. When several sightings "cross" within a second of each other, they
-/// are almost always one runner read several ways ("0109" / "010", "0059" / "0159"): keep the
-/// one with the most full-number reads (then most reads), mark the rest as duplicates.
-func oneBibPerCrossing(_ input: [Sighting]) -> [Sighting] {
+/// One runner = one bib. A number read on the same bib as a number read more often, that is a
+/// part of it ("516" of 5161, a digit hidden) or one digit off it (5164 for 5161), is that
+/// runner misread: marked as a duplicate of the stronger number.
+/// Same bib: at least half of its reads sit where a stronger number was read (see `SameBib`).
+/// Runners side by side with close numbers (3088, 3089) are never folded: their bibs are apart —
+/// even when they cross the mat together, both are listed.
+enum SameBib {
+  /// Tuned on bench/ (two hand-checked Chubb clips): 1.5 bib widths starts hiding real runners.
+  static let seconds = 0.6
+  /// Centres at most this many bib widths/heights apart.
+  static let distance = 0.75
+}
+
+func foldMisreads(_ input: [Sighting], frames: [OverlayFrame], segments: [Segment], pad: Double) -> [Sighting] {
   var out = input
-  let crossed = out.indices.filter { out[$0].label == "crossed" && out[$0].cross != nil }.sorted { out[$0].cross! < out[$1].cross! }
-  var i = 0
-  while i < crossed.count {
-    var group = [crossed[i]]
-    while i + group.count < crossed.count, out[crossed[i + group.count]].cross! - out[group.last!].cross! <= 1.0 {
-      group.append(crossed[i + group.count])
+  var readsOf: [String: [(t: Double, box: Box, fragment: Bool)]] = [:]
+  for f in frames { for b in f.bibs { readsOf[b.bib, default: []].append((f.t, b.box, b.fragment == true)) } }
+
+  func reads(_ s: Sighting) -> [(t: Double, box: Box, fragment: Bool)] {
+    (readsOf[s.bib] ?? []).filter { $0.t >= s.from - pad && $0.t <= s.to + pad }
+  }
+  // A bib belongs to one runner: every full read of it in this camera position is evidence,
+  // including fine-pass reads outside its own sighting (they never make a sighting of their own).
+  func fullReads(_ bib: String, segment: Int) -> [(t: Double, box: Box, fragment: Bool)] {
+    guard let seg = segments.first(where: { $0.index == segment }) else { return [] }
+    return (readsOf[bib] ?? []).filter { !$0.fragment && $0.t >= seg.from && $0.t < seg.to }
+  }
+  func near(_ a: Box, _ b: Box) -> Bool {
+    abs(a.cx - b.cx) <= SameBib.distance * max(a.x1 - a.x0, b.x1 - b.x0) && abs(a.cy - b.cy) <= SameBib.distance * max(a.y1 - a.y0, b.y1 - b.y0)
+  }
+  // Weakest first, so each misread is folded into the strongest number it sits on. Ties go by
+  // bib then time, so the result never depends on dictionary order.
+  func strength(_ k: Int) -> (Int, Int, String, Double) { (out[k].fullReads ?? 0, out[k].reads, out[k].bib, -out[k].from) }
+  for i in out.indices.sorted(by: { strength($0) < strength($1) }) {
+    guard out[i].label != "duplicate" else { continue }
+    let mine = reads(out[i])
+    guard !mine.isEmpty else { continue }
+    let isFragment = mine.filter(\.fragment).count * 2 > mine.count
+    let myFull = fullReads(out[i].bib, segment: out[i].segment).count
+    let owners = out.indices.filter { j in
+      j != i && out[j].label != "duplicate" && out[j].segment == out[i].segment
+        && isMisread(out[i].bib, of: out[j].bib, fragment: isFragment)
+        && fullReads(out[j].bib, segment: out[j].segment).count > myFull
     }
-    if group.count > 1 {
-      let keep = group.max { (out[$0].fullReads ?? 0, out[$0].reads) < (out[$1].fullReads ?? 0, out[$1].reads) }!
-      for g in group where g != keep {
-        out[g].label = "duplicate"
-        out[g].note = "same crossing as \(out[keep].bib) (read as \(out[g].bib))"
+    // Which of my reads sit on each candidate's bib; a misread spread over several runners of a
+    // group (0309 on 3090, 3092, 3093) still counts once per read.
+    var together: [Int: Int] = [:]
+    var onAny = 0
+    for m in mine {
+      var hit = false
+      for j in owners where fullReads(out[j].bib, segment: out[j].segment).contains(where: { abs($0.t - m.t) <= SameBib.seconds && near($0.box, m.box) }) {
+        together[j, default: 0] += 1
+        hit = true
       }
+      if hit { onAny += 1 }
     }
-    i += group.count
+    let owner = onAny * 2 >= mine.count
+      ? together.keys.max { together[$0]! != together[$1]! ? together[$0]! < together[$1]! : strength($0) < strength($1) } : nil
+    if let j = owner {
+      out[i].label = "duplicate"
+      out[i].note = "same runner as \(out[j].bib) (read as \(out[i].bib))"
+    }
   }
   return out
+}
+
+/// A runner is listed only if their number was read in full at least once (any frame of the
+/// sighting): 3-digit fragments alone are almost always a covered part of someone's bib or a
+/// logo. Measured on bench/: no right number was only ever read as a fragment. Sightings not
+/// decided yet (needs-scan) stay.
+func dropFragmentOnly(_ input: [Sighting], frames: [OverlayFrame], pad: Double) -> [Sighting] {
+  var fullTimes: [String: [Double]] = [:]
+  for f in frames { for b in f.bibs where b.fragment != true { fullTimes[b.bib, default: []].append(f.t) } }
+  return input.filter { s in
+    s.label == "needs-scan" || (fullTimes[s.bib] ?? []).contains { $0 >= s.from - pad && $0 <= s.to + pad }
+  }
+}
+
+/// Whether `a` could be `b` misread: one digit different, two neighbouring digits swapped, or —
+/// for a fragment — its digits (without padding zeros) found in `b` with at most one different.
+func isMisread(_ a: String, of b: String, fragment: Bool) -> Bool {
+  let x = Array(a), y = Array(b)
+  if !fragment, x.count == y.count {
+    let diff = x.indices.filter { x[$0] != y[$0] }
+    if diff.count == 1 { return true }
+    if diff.count == 2, diff[1] == diff[0] + 1, x[diff[0]] == y[diff[1]], x[diff[1]] == y[diff[0]] { return true }
+    return false
+  }
+  guard fragment else { return false }
+  let raw = Array(a.drop { $0 == "0" })
+  guard raw.count >= 2, raw.count < y.count else { return false }
+  return (0...(y.count - raw.count)).contains { start in
+    raw.indices.filter { raw[$0] != y[start + $0] }.count <= 1
+  }
 }
 
 /// Numbered automatic tags (mirrored in web/src/@shared/constants/SightingLabel.ts → SightingAutoTags).

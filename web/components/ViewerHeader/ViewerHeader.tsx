@@ -24,9 +24,6 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
-import {
-  cn
-} from '@/lib/utils';
 
 import {
   SaveState
@@ -40,7 +37,6 @@ export type ViewerHeaderVideo = {
 export type ViewerHeaderProps = {
   videos: ViewerHeaderVideo[];
   selectedVideoName: string | null;
-  summaryText: string | null;
   saveState: SaveState;
   saveErrorMessage: string | null;
   scanStatusText: string | null;
@@ -97,7 +93,6 @@ const SaveStateIndicator = ({
 export const ViewerHeader = ({
   videos,
   selectedVideoName,
-  summaryText,
   saveState,
   saveErrorMessage,
   scanStatusText,
@@ -171,10 +166,6 @@ export const ViewerHeader = ({
           {!hasVideoList && (
             <span className="truncate font-bold text-foreground">{videoPickerLabel}</span>
           )}
-
-          {summaryText && (
-            <span className="hidden truncate font-medium text-muted-foreground lg:inline">{summaryText}</span>
-          )}
         </div>
       </div>
 
@@ -205,7 +196,7 @@ export const ViewerHeader = ({
             size="sm"
             variant={isScanning ? 'outline' : 'default'}
             disabled={isScanButtonDisabled}
-            className={cn('rounded-full px-3.5 font-bold')}
+            className="px-3.5 font-bold"
             onClick={onScanClick}
           >
             {isScanning && <Loader2Icon className="animate-spin" data-icon="inline-start" />}

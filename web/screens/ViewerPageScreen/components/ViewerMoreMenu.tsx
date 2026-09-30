@@ -21,7 +21,6 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuShortcut,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import {
@@ -48,20 +47,18 @@ type ViewerMoreMenuProps = {
   hasVideo: boolean;
   canClearScans: boolean;
   isPeopleFirst: boolean;
+  hasBibDesignsInUse: boolean;
   overlaySettings: OverlaySettings;
   swipeSpeed: number;
-  isSwipeReversed: boolean;
   onOpenVideoFile: () => void;
-  onImportResults: () => void;
   onOpenBibNumbers: () => void;
   onOpenBibDesigns: () => void;
   onSetRaceClock: () => void;
-  onSplitCameraPosition: () => void;
+  onExportCsv: () => void;
   onDownloadSegments: () => void;
   onPeopleFirstChange: (isPeopleFirst: boolean) => void;
   onOverlaySettingsChange: (settings: OverlaySettings) => void;
   onSwipeSpeedChange: (speed: number) => void;
-  onSwipeReversedChange: (isReversed: boolean) => void;
   onClearScans: () => void;
 };
 
@@ -70,9 +67,8 @@ const KeyboardShortcuts = [
   ['← / →', 'Step 0.1 s'],
   ['⇧ ← / →', 'Step 1 s'],
   ['J / K / L', 'Back 1 s / pause / play faster'],
-  ['[ / ]', 'Previous / next runner'],
-  ['M', 'Mark finish line'],
-  ['S', 'Split camera position'],
+  ['M', 'Draw finish line'],
+  ['S', 'Camera moved here'],
   ['1–4', 'Tag the selected runner'],
   ['Esc', 'Stop marking or picking'],
   ['⌥ + swipe', '10× faster scrubbing'],
@@ -87,20 +83,18 @@ export const ViewerMoreMenu = ({
   hasVideo,
   canClearScans,
   isPeopleFirst,
+  hasBibDesignsInUse,
   overlaySettings,
   swipeSpeed,
-  isSwipeReversed,
   onOpenVideoFile,
-  onImportResults,
   onOpenBibNumbers,
   onOpenBibDesigns,
   onSetRaceClock,
-  onSplitCameraPosition,
+  onExportCsv,
   onDownloadSegments,
   onPeopleFirstChange,
   onOverlaySettingsChange,
   onSwipeSpeedChange,
-  onSwipeReversedChange,
   onClearScans,
 }: ViewerMoreMenuProps) => {
   const updateOverlaySettings = (patch: Partial<OverlaySettings>) => {
@@ -117,7 +111,6 @@ export const ViewerMoreMenu = ({
           <Button
             variant="outline"
             size="sm"
-            className="rounded-full"
           />
         )}
       >
@@ -132,7 +125,6 @@ export const ViewerMoreMenu = ({
         <DropdownMenuGroup>
           <DropdownMenuLabel className={sectionLabelClassName}>Open files</DropdownMenuLabel>
           <DropdownMenuItem onClick={onOpenVideoFile}>Open video file…</DropdownMenuItem>
-          <DropdownMenuItem onClick={onImportResults}>Import saved results…</DropdownMenuItem>
         </DropdownMenuGroup>
 
         {isEventAvailable && (
@@ -169,12 +161,10 @@ export const ViewerMoreMenu = ({
           </DropdownMenuItem>
           <DropdownMenuItem
             disabled={!hasVideo}
-            onClick={onSplitCameraPosition}
+            title="Download every runner with its tags as a CSV"
+            onClick={onExportCsv}
           >
-            Split camera position here
-            <DropdownMenuShortcut>
-              <Kbd>S</Kbd>
-            </DropdownMenuShortcut>
+            Export runners (CSV)
           </DropdownMenuItem>
           <DropdownMenuItem
             disabled={!hasVideo}
@@ -188,9 +178,12 @@ export const ViewerMoreMenu = ({
         <DropdownMenuGroup>
           <DropdownMenuLabel className={sectionLabelClassName}>Scanning</DropdownMenuLabel>
           <DropdownMenuCheckboxItem
-            checked={isPeopleFirst}
+            checked={isPeopleFirst && !hasBibDesignsInUse}
+            disabled={hasBibDesignsInUse}
             closeOnClick={false}
-            title="Experimental: find people first and read bibs only on their torsos. Changing it scans this video again from the start."
+            title={hasBibDesignsInUse
+              ? 'Off while bib designs are ticked: the designs choose where to read. Untick them in Bib designs… to use this.'
+              : 'Experimental: find people first and read bibs only on their torsos. Changing it scans this video again from the start.'}
             onCheckedChange={onPeopleFirstChange}
           >
             Only look for people (faster)
@@ -247,13 +240,6 @@ export const ViewerMoreMenu = ({
             />
             <span className="w-24 text-right text-xs text-muted-foreground tabular-nums">{formatSwipeSpeed(swipeSpeed)}</span>
           </div>
-          <DropdownMenuCheckboxItem
-            checked={isSwipeReversed}
-            closeOnClick={false}
-            onCheckedChange={onSwipeReversedChange}
-          >
-            Reverse direction
-          </DropdownMenuCheckboxItem>
         </DropdownMenuGroup>
 
         <DropdownMenuSeparator />
@@ -288,7 +274,7 @@ export const ViewerMoreMenu = ({
           <DropdownMenuItem
             variant="destructive"
             disabled={!canClearScans}
-            className="w-fit rounded-full border border-destructive/40 px-3"
+            className="w-fit border border-destructive/40 px-3"
             onClick={onClearScans}
           >
             Clear scans…

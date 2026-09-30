@@ -6,9 +6,13 @@ import {
 } from 'react';
 
 import {
-  XIcon
+  CheckIcon,
+  Trash2Icon
 } from 'lucide-react';
 
+import {
+  Button
+} from '@/components/ui/button';
 import {
   Input
 } from '@/components/ui/input';
@@ -24,25 +28,57 @@ import {
   RunnerZoneLabels
 } from '@basekm/@shared/constants';
 import {
-  labelTag
-} from '@basekm/@shared/utils/sightingTags';
-import {
-  SightingDto,
-  TagsBySightingKey
+  SightingDto
 } from '@basekm/dtos';
 
 type RunnerTagEditorProps = {
   sighting: SightingDto;
-  tags: TagsBySightingKey;
   myTags: string[];
   onToggleTag: (tag: string) => void;
+  onRemove: () => void;
 };
+
+type TagOptionProps = {
+  label: string;
+  shortcut?: number;
+  isOn: boolean;
+  onClick: () => void;
+};
+
+const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+const TagOption = ({
+  label,
+  shortcut,
+  isOn,
+  onClick,
+}: TagOptionProps) => (
+  <button
+    type="button"
+    aria-pressed={isOn}
+    className={cn(
+      'flex h-10 w-full items-center gap-2.5 rounded-lg border bg-background px-3 text-left text-sm font-semibold transition-colors hover:bg-muted',
+      isOn && 'border-blue-600 bg-blue-600/10 text-blue-800 hover:bg-blue-600/15',
+    )}
+    onClick={onClick}
+  >
+    {shortcut !== undefined && <Kbd className="h-5 min-w-5">{shortcut}</Kbd>}
+    <span className="min-w-0 flex-1 truncate">{label}</span>
+    {isOn && <CheckIcon className="size-4 shrink-0 text-blue-600" />}
+  </button>
+);
+
+const SectionLabel = ({
+  children,
+}: {
+  children: string;
+}) => <p className="text-xs font-semibold text-muted-foreground">{children}</p>;
 
 export const RunnerTagEditor = ({
   sighting,
-  tags,
   myTags,
   onToggleTag,
+  onRemove,
 }: RunnerTagEditorProps) => {
   const [customTag, setCustomTag] = useState('');
   const customTags = myTags.filter((tag) => !PresetTags.includes(tag));
@@ -56,62 +92,67 @@ export const RunnerTagEditor = ({
 
     event.preventDefault();
     const tag = customTag.trim().toLowerCase();
-    if (tag) {
+    const isAlreadyOn = myTags.includes(tag);
+    if (tag && !isAlreadyOn) {
       onToggleTag(tag);
     }
     setCustomTag('');
   };
 
   return (
-    <div className="mx-2 mb-2 flex flex-col gap-2 rounded-lg border bg-muted/40 p-3">
-      {details && <p className="text-xs text-muted-foreground">{details}</p>}
+    <div className="mx-2 mb-2 flex flex-col gap-3 rounded-lg border bg-muted/40 p-3">
+      {details && <SectionLabel>{details}</SectionLabel>}
 
-      <div className="flex flex-wrap gap-1.5">
-        {PresetTags.map((tag, index) => {
-          const isOn = myTags.includes(tag);
-
-          return (
-            <button
-              key={tag}
-              type="button"
-              className={cn(
-                'inline-flex h-7 items-center gap-1.5 rounded-full border bg-background px-2.5 text-xs font-semibold transition-colors hover:bg-muted',
-                isOn && 'border-blue-600 bg-blue-600 text-white hover:bg-blue-600/90',
-              )}
-              onClick={() => onToggleTag(tag)}
-            >
-              <Kbd className={cn('h-4 min-w-4', isOn && 'bg-white/20 text-white')}>{index + 1}</Kbd>
-              {labelTag({
-                tags,
-                tag,
-              })}
-            </button>
-          );
-        })}
-
-        {customTags.map((tag) => (
-          <button
+      <div className="flex flex-col gap-1.5">
+        {PresetTags.map((tag, index) => (
+          <TagOption
             key={tag}
-            type="button"
-            className="inline-flex h-7 items-center gap-1 rounded-full border border-blue-600 bg-blue-600 px-2.5 text-xs font-semibold text-white hover:bg-blue-600/90"
+            label={capitalize(tag)}
+            shortcut={index + 1}
+            isOn={myTags.includes(tag)}
             onClick={() => onToggleTag(tag)}
-          >
-            {labelTag({
-              tags,
-              tag,
-            })}
-            <XIcon className="size-3" />
-          </button>
+          />
         ))}
       </div>
 
-      <Input
-        value={customTag}
-        placeholder="Add a tag… (Enter)"
-        className="h-8 bg-background text-xs"
-        onChange={(event) => setCustomTag(event.target.value)}
-        onKeyDown={handleCustomTagKeyDown}
-      />
+      {customTags.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <SectionLabel>Your tags</SectionLabel>
+          {customTags.map((tag) => (
+            <TagOption
+              key={tag}
+              label={tag}
+              isOn
+              onClick={() => onToggleTag(tag)}
+            />
+          ))}
+        </div>
+      )}
+
+      <div className="flex flex-col gap-1.5">
+        <SectionLabel>Add your own</SectionLabel>
+        <Input
+          value={customTag}
+          placeholder="e.g. the correct bib number"
+          className="h-10 bg-background"
+          onChange={(event) => setCustomTag(event.target.value)}
+          onKeyDown={handleCustomTagKeyDown}
+        />
+        <p className="text-xs text-muted-foreground">Press Enter to add</p>
+      </div>
+
+      {sighting.manual && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="self-start text-destructive hover:bg-destructive/10 hover:text-destructive"
+          onClick={onRemove}
+        >
+          <Trash2Icon />
+          Remove this runner
+        </Button>
+      )}
     </div>
   );
 };

@@ -45,11 +45,6 @@ export class ConfigService {
     return REPO_FOLDER;
   }
 
-  /** The viewer: the Next.js app in web/, built as static files (cd web && npm run build). */
-  get ViewerFolder() {
-    return path.join(REPO_FOLDER, 'web', 'out');
-  }
-
   get BibwatchBinary() {
     return path.join(REPO_FOLDER, '.build', 'release', 'bibwatch');
   }

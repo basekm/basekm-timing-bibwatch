@@ -1,7 +1,7 @@
 {
   "name": "bibwatch-server",
   "version": "0.0.1",
-  "description": "Local server for the bibwatch viewer: serves the viewer and media, runs bibwatch scans",
+  "description": "Local server for the bibwatch viewer: the API and media, runs bibwatch scans",
   "author": "",
   "private": true,
   "license": "UNLICENSED",

@@ -16,6 +16,7 @@ import {
   isScanRunning,
   ScanPhaseLabels,
   ScanStateId,
+  SelectedVideoStorageKey,
   SightingLabel
 } from '@basekm/@shared/constants';
 import {
@@ -40,7 +41,16 @@ import {
   segmentAt
 } from '@basekm/@shared/utils/frameGeometry';
 import {
+  addManualRead,
+  findSightingOfRead,
+  manualReadsOf,
+  markManualSightings,
+  removeManualSighting,
+  withManualReads
+} from '@basekm/@shared/utils/manualReads';
+import {
   currentSightingLabel,
+  sightingKey,
   toggleSightingTag
 } from '@basekm/@shared/utils/sightingTags';
 import {
@@ -57,7 +67,9 @@ import {
 import {
   CameraSegmentDto,
   DetectionsDto,
+  ManualReadDto,
   SegmentsFileDto,
+  SightingDto,
   SightingSearchResultDto,
   TagsBySightingKey
 } from '@basekm/dtos';
@@ -127,6 +139,27 @@ const writeLegacyClock = ({
   }
 };
 
+const readSelectedVideo = () => {
+  try {
+    return window.localStorage.getItem(SelectedVideoStorageKey);
+  } catch {
+    return null;
+  }
+};
+
+const writeSelectedVideo = (videoName: string | null) => {
+  try {
+    if (videoName === null) {
+      window.localStorage.removeItem(SelectedVideoStorageKey);
+      return;
+    }
+
+    window.localStorage.setItem(SelectedVideoStorageKey, videoName);
+  } catch {
+    return;
+  }
+};
+
 const describeError = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 const formatEta = (seconds: number | null | undefined) => {
@@ -160,6 +193,7 @@ export const useViewerSession = ({
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [isPeopleFirst, setIsPeopleFirst] = useState(false);
   const [finishLinePoints, setFinishLinePoints] = useState<FramePoint[] | null>(null);
+  const [pendingRead, setPendingRead] = useState<ManualReadDto | null>(null);
 
   const segmentsRef = useRef<CameraSegmentDto[]>([]);
   const mediaVideo = videoSource?.mediaVideo ?? null;
@@ -207,7 +241,15 @@ export const useViewerSession = ({
   const cancelScanJob = scanCancelMutation.mutate;
   const clearScanFiles = scanClearMutation.mutateAsync;
 
-  const frames = useMemo(() => detections?.frames ?? [], [detections]);
+  const manualReads = useMemo(() => manualReadsOf(tags), [tags]);
+
+  const scanWithManualReads = useMemo(() => withManualReads({
+    frames: detections?.frames ?? [],
+    coarseHits: detections?.coarseHits,
+    manualReads,
+  }), [detections, manualReads]);
+
+  const frames = scanWithManualReads.frames;
 
   const targets = useMemo(() => {
     if (detections?.targets) {
@@ -222,18 +264,33 @@ export const useViewerSession = ({
       return [];
     }
 
-    if (detections.coarseHits) {
-      return decideSightings({
-        coarseHits: detections.coarseHits,
+    if (detections.coarseHits && scanWithManualReads.coarseHits) {
+      const decided = decideSightings({
+        coarseHits: scanWithManualReads.coarseHits,
         segments,
         frames,
         targets,
         settings: detections.settings,
       });
+      return markManualSightings({
+        sightings: decided,
+        manualReads,
+      });
     }
 
     return sortSightingsByTime(detections.sightings ?? []);
-  }, [detections, segments, frames, targets]);
+  }, [detections, segments, frames, targets, scanWithManualReads, manualReads]);
+
+  if (pendingRead) {
+    const added = findSightingOfRead({
+      sightings,
+      read: pendingRead,
+    });
+    if (added) {
+      setSelectedKey(sightingKey(added));
+    }
+    setPendingRead(null);
+  }
 
   const crossedBibs = useMemo(() => {
     const crossed = sightings.filter((sighting) => currentSightingLabel(sighting) === SightingLabel.Crossed);
@@ -343,6 +400,7 @@ export const useViewerSession = ({
     const legacyClock = readLegacyClock(source.name);
 
     setVideoSource(source);
+    writeSelectedVideo(source.mediaVideo);
     setClockOffset(serverClock ?? legacyClock ?? null);
     setFinishLinePoints(null);
 
@@ -418,37 +476,18 @@ export const useViewerSession = ({
     await loadTags(scanFiles?.tags);
   }, [loadDetections, loadTags, loadVideo, mediaOverview]);
 
-  const openFile = useCallback(async (file: File) => {
+  const openFile = useCallback((file: File) => {
     const isVideo = file.type.startsWith('video/') || /\.(mp4|mov|m4v)$/i.test(file.name);
-
-    if (isVideo) {
-      loadVideo({
-        src: URL.createObjectURL(file),
-        name: file.name,
-        mediaVideo: null,
-      });
+    if (!isVideo) {
       return;
     }
 
-    try {
-      const loaded = loadDetections(JSON.parse(await file.text()));
-      const isOtherVideo = videoSource && loaded.video && loaded.video !== videoSource.name;
-
-      if (isOtherVideo) {
-        toast.add({
-          title: 'These results are for another video',
-          description: `${file.name} is for ${loaded.video}, but the video is ${videoSource?.name}.`,
-          type: 'warning',
-        });
-      }
-    } catch (error) {
-      toast.add({
-        title: `Could not read ${file.name}`,
-        description: describeError(error),
-        type: 'error',
-      });
-    }
-  }, [loadDetections, loadVideo, videoSource]);
+    loadVideo({
+      src: URL.createObjectURL(file),
+      name: file.name,
+      mediaVideo: null,
+    });
+  }, [loadVideo]);
 
   const openFromQuery = useCallback(async () => {
     const query = new URLSearchParams(window.location.search);
@@ -478,6 +517,16 @@ export const useViewerSession = ({
       }
     }
   }, [loadDetections, loadVideo]);
+
+  const restoreSelectedVideo = useCallback(async () => {
+    const hasQueryVideo = new URLSearchParams(window.location.search).has('video');
+    const storedVideo = readSelectedVideo();
+    if (hasQueryVideo || videoSource || !storedVideo || !mediaOverview?.videos.includes(storedVideo)) {
+      return;
+    }
+
+    await openLibraryVideo(storedVideo);
+  }, [mediaOverview, openLibraryVideo, videoSource]);
 
   const saveClock = useCallback((nextClockOffset: number) => {
     setClockOffset(nextClockOffset);
@@ -609,16 +658,7 @@ export const useViewerSession = ({
     setFinishLinePoints(null);
   }, []);
 
-  const toggleTag = useCallback((tag: string) => {
-    if (!selectedKey || !tag) {
-      return;
-    }
-
-    const nextTags = toggleSightingTag({
-      tags,
-      key: selectedKey,
-      tag,
-    });
+  const updateTags = useCallback((nextTags: TagsBySightingKey) => {
     setTags(nextTags);
 
     const video = mediaVideoRef.current;
@@ -640,7 +680,46 @@ export const useViewerSession = ({
       }),
       failureMessage: 'Could not save tags',
     });
-  }, [isServerAvailable, scheduleSave, selectedKey, tags, saveTags]);
+  }, [isServerAvailable, scheduleSave, saveTags]);
+
+  const toggleTag = useCallback((tag: string) => {
+    if (!selectedKey || !tag) {
+      return;
+    }
+
+    updateTags(toggleSightingTag({
+      tags,
+      key: selectedKey,
+      tag,
+    }));
+  }, [selectedKey, tags, updateTags]);
+
+  const canAddRunners = Boolean(detections?.coarseHits);
+
+  const addRunner = useCallback((read: ManualReadDto) => {
+    if (!canAddRunners) {
+      toast.add({
+        title: 'Scan this video again to add runners by hand',
+        description: 'This scan was made by an older version that keeps only the final runner list.',
+        type: 'info',
+      });
+      return;
+    }
+
+    updateTags(addManualRead({
+      tags,
+      read,
+    }));
+    setPendingRead(read);
+  }, [canAddRunners, tags, updateTags]);
+
+  const removeRunner = useCallback((sighting: SightingDto) => {
+    updateTags(removeManualSighting({
+      tags,
+      sighting,
+    }));
+    setSelectedKey(null);
+  }, [tags, updateTags]);
 
   const exportSegments = useCallback(() => {
     if (!segments.length) {
@@ -751,8 +830,8 @@ export const useViewerSession = ({
       return 'Last scan failed';
     }
 
-    return `Scan finished · ${sightings.length} runners found`;
-  }, [detections, isScanning, isServerAvailable, mediaVideo, scanStatus, sightings.length]);
+    return 'Scan finished';
+  }, [detections, isScanning, isServerAvailable, mediaVideo, scanStatus]);
 
   const scanProgress = isScanning && scanStatus?.total ? (scanStatus.done ?? 0) / scanStatus.total : null;
 
@@ -791,7 +870,8 @@ export const useViewerSession = ({
         clock: clockOffset !== null ? formatClockTime(clockOffset) : null,
         templates: templateIds,
         from: Number(controller.currentTime.toFixed(1)),
-        peopleFirst: isPeopleFirst,
+        // Bib designs choose where to read; "Only look for people" applies without them.
+        peopleFirst: isPeopleFirst && templateIds.length === 0,
       });
       lastCheckpointRef.current = null;
     } catch (error) {
@@ -898,12 +978,16 @@ export const useViewerSession = ({
     openLibraryVideo,
     openFile,
     openFromQuery,
+    restoreSelectedVideo,
     saveClock,
     splitSegmentHere,
     toggleFinishLineMarking,
     addFinishLinePoint,
     cancelFinishLineMarking,
     toggleTag,
+    canAddRunners,
+    addRunner,
+    removeRunner,
     exportSegments,
     startScan,
     clearScans,

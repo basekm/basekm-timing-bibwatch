@@ -12,8 +12,8 @@ saved and nothing is uploaded; the viewer opens the video straight from disk.
 
 ```bash
 swift build -c release                  # binary: .build/release/bibwatch
-cd web && npm install && npm run build  # the viewer (Next.js, static files in web/out)
-cd server && npm install                # the viewer's local server (NestJS, Node 22)
+cd web && npm install && npm run build  # the viewer (Next.js, its own process)
+cd server && npm install                # the API and media server (NestJS, Node 22)
 ```
 
 ## Quick start (from the viewer)
@@ -22,9 +22,8 @@ cd server && npm install                # the viewer's local server (NestJS, Nod
 swift build -c release
 mkdir -p media && ln -s "/path/GX011760.MP4" media/     # videos (symlinks are fine)
 cp targets.txt media/                                  # optional: bib numbers to watch
-(cd web && npm install && npm run build)               # the viewer
-cd server && npm install && npm run build
-MEDIA_FOLDER=../media npm run start:prod               # http://127.0.0.1:8765/
+(cd server && npm install && npm run build && MEDIA_FOLDER=../media npm run start:prod) &   # API on :8765
+cd web && npm install && npm run build && npm run start                                     # http://localhost:3000/
 ```
 
 Or put `MEDIA_FOLDER` (and `PORT`) in `server/.env.development` / `.env.production`
@@ -68,7 +67,7 @@ from before tags moved into the database.
 ## The viewer at a glance
 
 The viewer is a Next.js app in `web/` (shadcn/ui + Tailwind, laid out and themed like
-`basekm-timing-engine-web`), built into static files that the server serves.
+`basekm-timing-engine-web`), run as its own process next to the server.
 
 - **Header**: the video list, how many runners were spotted, *Saved automatically*, the scan
   status and **Run scan / Scan again / Stop scan**, and **⋯ More**.
@@ -128,7 +127,7 @@ Every bib seen gets a **numbered tag** — the mat is optional:
 | 002 | Near the mat | on or near the mat without a clear crossing (photos, waiting) |
 | 003 | Passing | seen, never close to the mat |
 | 004 | Camera moving | older scans only: every bib is now captured and tagged the same, camera moving or not |
-| 005 | Duplicate | same crossing as another bib (a misread) — the note says which |
+| 005 | Duplicate | the same runner read as another number (a misread) — the note says which |
 
 Plus detail on each sighting: **zone** (background / before-mat / on-mat / past-mat),
 **direction** (toward / away / still) and the **design** (template) it was read with.
@@ -232,28 +231,60 @@ Load the video and `detections.json` in the viewer:
   pause / play (press `L` again for 2× and 4×) · `[`/`]` previous/next runner · `M` mark finish line ·
   `S` split · `1`–`4` tag · `Esc` stop marking.
 
-## Opening the viewer
+### 6. Measure accuracy (answer keys)
 
-Build the viewer once (`cd web && npm run build`, into `web/out`), then start the server; it
-serves the viewer at `/`:
+To compare reading methods (whole frame, people only, templates), score them against a
+hand-checked list of the bibs in a stretch of video:
 
 ```bash
-cd server && MEDIA_FOLDER=../out/media npm run start:prod    # binds 127.0.0.1 only
-# http://127.0.0.1:8765/?video=/media/GX011759.MP4&data=/media/detections.json
+# 1. Scan the stretch each way, into separate folders
+bibwatch scan clip.mp4 out/whole  --start 2:30 --end 3:00 --no-color --max-bib 9999
+bibwatch scan clip.mp4 out/people --start 2:30 --end 3:00 --no-color --max-bib 9999 --people-first
+
+# 2. Check by hand every number either scan read (close-ups from the video), save key.txt
+bibwatch review out/review out/whole out/people --video clip.mp4 --start 2:30 --end 3:00
+open out/review/review.html
+
+# 3. Score: bibs found / missed, wrong numbers, share of single-frame reads that were right
+bibwatch score key.txt out/whole out/people
+
+# 4. Why was a number wrong? The torsos picture "people only" read at that moment
+bibwatch mosaic clip.mp4 out/mosaic.png --at 68.2 --max-bib 9999 --key key.txt
 ```
+
+A key is one bib per line; `# range: 02:30-03:00` sets the stretch, and `0147?` marks a bib
+you couldn't confirm (not counted either way). `bench/run.sh` runs all of this on the two
+hand-checked Chubb clips in `bench/keys` (and checks the viewer decides sightings exactly as
+the scanner does); run it after any change to reading or deciding. `--ai` adds an AI check's reads to the review
+page. The review page's close-ups are the only frames bibwatch writes to disk.
+
+## Opening the viewer
+
+The viewer and the server are two processes. Start the server (the API and the media), then
+the viewer; the viewer passes `/api` and `/media` on to the server, so the browser only talks
+to the viewer:
+
+```bash
+cd server && MEDIA_FOLDER=../out/media npm run start:prod    # :8765, binds 127.0.0.1 only
+cd web && npm run build && npm run start                     # http://localhost:3000
+# http://localhost:3000/?video=/media/GX011759.MP4&data=/media/detections.json
+```
+
+The server's address is `BIBWATCH_SERVER_URL` (default http://127.0.0.1:8765; see
+`web/.env.example`). It is fixed into the build, so set it before `npm run build`. The viewer
+starts without the server, but the video list, scans and saving need it.
 
 Put the video (a symlink is fine) and JSON in the `MEDIA_FOLDER`. Without a media folder you
 can still drop a video and its JSON on the page (or **⋯ More › Open video file…**); nothing is
 uploaded.
 
-Working on the viewer: run the server as above, then `cd web && npm run dev` —
-http://localhost:3000 with hot reload; `/api` and `/media` are passed on to the server
-(`BIBWATCH_SERVER_URL`, default http://127.0.0.1:8765). The app follows
+Working on the viewer: `cd web && npm run dev` instead of build + start —
+http://localhost:3000 with hot reload. The app follows
 `basekm-timing-engine-web` (structure, shadcn/ui primitives, theme); see `web/.agents/skills/`.
 
 The server (`server/`) is a NestJS app laid out like `basekm-timing-backend`: one module per
 area (`media`, `scans`, `templates`, `bibwatch` runs the Swift binary), DTOs and constants in
-`src/@shared`. It serves the viewer at `/`, the media folder at `/media/` (with HTTP Range, so
+`src/@shared`. It serves the media folder at `/media/` (with HTTP Range, so
 video seeking works) and the API at `/api/`.
 
 GoPro files are HEVC. Safari and Chrome on macOS play them. If a browser can't, make a
@@ -266,9 +297,15 @@ ffmpeg -i GX011760.MP4 -vf scale=1280:-2 -c:v libx264 -preset veryfast -crf 23 -
 ## How it decides
 
 - **Bib reads**: Vision text recognition; 4-digit numbers `0001`–`max-bib`, plus 3-digit
-  fragments (a digit hidden behind someone). The **bib-colour check** keeps only white
+  fragments (a digit hidden behind someone). Letters that look like digits count ("5O19"),
+  but not inside a word ("CHUBB" is not 188). The **bib-colour check** keeps only white
   digits on the magenta 5K band — drops shirt logos, the "2026" in the bib logo, signage,
   and other categories' bibs.
+- **One runner, one number**: a number read on the same bib as a number read more often
+  (within 0.6 s, less than a bib width away) that is part of it ("516" of 5161) or one digit
+  off (5164) is tagged 005 Duplicate of it. Runners side by side with close numbers
+  (3088, 3089) both stay: their bibs are apart. A number never read in full — only as
+  3-digit fragments — isn't listed.
 - **Crossing**: the runner's feet (bottom of their person box) move from clearly before
   the mat's near edge onto/over it, toward the camera, within the mat's width. The runner
   is followed forwards and backwards from the frames where the bib is readable.
@@ -277,8 +314,9 @@ ffmpeg -i GX011760.MP4 -vf scale=1280:-2 -c:v libx264 -preset veryfast -crf 23 -
 
 ## Known limitations (next)
 
-- **Fragments**: "014" read from bib 0147 can get the same crossing as 0147. Prefer the full
-  4-digit read on the same bib.
+- **Consistent misreads**: when the reader gets a bib wrong more often than right (3150 for
+  3156), the wrong number is listed and the right one folded into it.
+- **Always-covered bibs**: a runner whose bib is only ever read as 3 digits isn't listed.
 - **Logos on the back of pink singlets** can pass the colour check (e.g. "104"). Require
   large digits dominating the band, "5KM", or a confident read.
 - Short "fixed" pieces can remain around busy camera handling. Marking the same mat on

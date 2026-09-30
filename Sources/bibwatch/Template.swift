@@ -126,10 +126,33 @@ func findBibCandidates(_ px: Pixels, _ tpl: BibTemplate, widen: Double = 0) -> [
     return rule.isBand(h, s, v)
   }
 
+  /// Share of the non-digit pixels inside a box that are band colour.
+  func bandShare(inside x0: Int, _ y0: Int, _ x1: Int, _ y1: Int) -> Double {
+    let step = max(1, (y1 - y0) / 16)
+    var other = 0, band = 0
+    for y in stride(from: y0, through: y1, by: step) {
+      for x in stride(from: x0, through: x1, by: step) where !white[y * W + x] {
+        other += 1; if bandAt(x, y) { band += 1 }
+      }
+    }
+    return other > 0 ? Double(band) / Double(other) : 0
+  }
+  /// Share of band colour in strips left and right of a box, a third of its height wide.
+  func bandShare(beside x0: Int, _ y0: Int, _ x1: Int, _ y1: Int) -> Double {
+    let h = y1 - y0 + 1, step = max(1, h / 16)
+    var all = 0, band = 0
+    for y in stride(from: y0, through: y1, by: step) {
+      for x in stride(from: x0 - h / 3, to: x0 - 1, by: step) { all += 1; if bandAt(x, y) { band += 1 } }
+      for x in stride(from: x1 + 2, to: x1 + h / 3, by: step) { all += 1; if bandAt(x, y) { band += 1 } }
+    }
+    return all > 0 ? Double(band) / Double(all) : 0
+  }
+
   // Connected white blobs (4-neighbour), keeping digit-sized ones.
   struct Blob { var x0: Int, y0: Int, x1: Int, y1: Int, n: Int
     var h: Int { y1 - y0 + 1 }; var w: Int { x1 - x0 + 1 }
     var cy: Double { Double(y0 + y1) / 2 } }
+  var numbers: [Blob] = []
   var label = [Int32](repeating: 0, count: W * H)
   var blobs: [Blob] = []
   var stack: [Int] = []
@@ -152,8 +175,18 @@ func findBibCandidates(_ px: Pixels, _ tpl: BibTemplate, widen: Double = 0) -> [
     if tooBig { continue }
     let aspect = Double(b.w) / Double(b.h)
     let fill = Double(b.n) / Double(b.w * b.h)
-    guard b.h >= minH, b.h <= maxH, aspect >= 0.12, aspect <= 1.1, fill >= 0.15, fill <= 0.9 else { continue }
-    // The blob must sit on band colour: sample a ring around it.
+    guard b.h >= minH, b.h <= maxH, fill >= 0.15, fill <= 0.9 else { continue }
+    // A whole number as one blob: digits printed close together (or blurred) touch. It counts
+    // when what isn't digit inside it, and beside it, is band colour — white paper doesn't.
+    if aspect > 1.1 {
+      guard aspect <= Double(tpl.digits) * 0.8, fill <= 0.75,
+            bandShare(inside: b.x0, b.y0, b.x1, b.y1) >= 0.65, bandShare(beside: b.x0, b.y0, b.x1, b.y1) >= 0.5 else { continue }
+      numbers.append(b)
+      continue
+    }
+    guard aspect >= 0.12 else { continue }
+    // The blob must sit on band colour: sample a ring around it — or, when the band's margin
+    // is thinner than the ring (the ring lands on white paper), what's inside and beside it.
     let pad = max(2, b.h / 4)
     var ring = 0, band = 0
     let stepR = max(1, b.h / 8)
@@ -163,7 +196,8 @@ func findBibCandidates(_ px: Pixels, _ tpl: BibTemplate, widen: Double = 0) -> [
     for y in stride(from: b.y0 - pad, through: b.y1 + pad, by: stepR) {
       for x in [b.x0 - pad, b.x1 + pad] { ring += 1; if bandAt(x, y) { band += 1 } }
     }
-    if ring > 0 && Double(band) / Double(ring) >= 0.40 { blobs.append(b) }
+    if ring > 0 && Double(band) / Double(ring) >= 0.40 { blobs.append(b); continue }
+    if bandShare(inside: b.x0, b.y0, b.x1, b.y1) >= 0.65, bandShare(beside: b.x0, b.y0, b.x1, b.y1) >= 0.5 { blobs.append(b) }
   }
 
   // Rows of similar blobs = a number.
@@ -193,6 +227,13 @@ func findBibCandidates(_ px: Pixels, _ tpl: BibTemplate, widen: Double = 0) -> [
     let by0 = (Double(y0) - 0.35 * h) / Double(H), by1 = (Double(y1) + 0.35 * h) / Double(H)
     out.append(BibCandidate(box: Box(x0: max(0, bx0), y0: max(0, by0), x1: min(1, bx1), y1: min(1, by1)),
                             digitHeight: h / Double(H), members: group.count))
+  }
+  for b in numbers {
+    let h = Double(b.h)
+    let bx0 = (Double(b.x0) - 0.5 * h) / Double(W), bx1 = (Double(b.x1) + 0.5 * h) / Double(W)
+    let by0 = (Double(b.y0) - 0.35 * h) / Double(H), by1 = (Double(b.y1) + 0.35 * h) / Double(H)
+    out.append(BibCandidate(box: Box(x0: max(0, bx0), y0: max(0, by0), x1: min(1, bx1), y1: min(1, by1)),
+                            digitHeight: h / Double(H), members: 1))
   }
   return out
 }
@@ -350,22 +391,34 @@ func calibrateTemplate(_ start: BibTemplate, video: VideoSource, points: [(Doubl
 
   for (t, x, y) in points {
     guard let img = video.frame(at: t), let px = Pixels(img) else { continue }
-    // Look near the click with a wide colour range and any digit size.
-    var loose = tpl
-    loose.hueTolerance = anyColour ? 180 : max(tpl.hueTolerance, 35); loose.bandSatMin = 0.2; loose.bandValMin = 0.15
-    loose.digitHeightMin = 0.004; loose.digitHeightMax = 0.12
-    loose.digitSatMax = 0.5; loose.digitValMin = 0.35
-    let near = findBibCandidates(px, loose).filter { c in
-      let dx = max(c.box.x0 - x, 0, x - c.box.x1), dy = max(c.box.y0 - y, 0, y - c.box.y1)
-      return dx < 0.03 && dy < 0.03
-    }.min { abs($0.box.cx - x) + abs($0.box.cy - y) < abs($1.box.cx - x) + abs($1.box.cy - y) }
+    // Look near the click with a wide colour range and any digit size. Digits and band are told
+    // apart by the colours measured at the click (a pale band is not "white"); the fixed wide
+    // limits are the fallback.
+    let split = splitDigitsFromBand(px, x: x, y: y)
+    var near: BibCandidate? = nil
+    for (digitSatMax, bandSatMin) in (split.map { [($0, $0 + 0.02)] } ?? []) + [(0.5, 0.2)] where near == nil {
+      var loose = tpl
+      loose.hueTolerance = anyColour ? 180 : max(tpl.hueTolerance, 35); loose.bandSatMin = bandSatMin; loose.bandValMin = 0.15
+      loose.digitHeightMin = 0.004; loose.digitHeightMax = 0.12
+      loose.digitSatMax = digitSatMax; loose.digitValMin = 0.35
+      near = findBibCandidates(px, loose).filter { c in
+        let dx = max(c.box.x0 - x, 0, x - c.box.x1), dy = max(c.box.y0 - y, 0, y - c.box.y1)
+        return dx < 0.03 && dy < 0.03
+      }.min { abs($0.box.cx - x) + abs($0.box.cy - y) < abs($1.box.cx - x) + abs($1.box.cy - y) }
+    }
     guard let c = near else {
       print(String(format: "  %@ (%.2f, %.2f): no bib number found there", formatTime(t, tenths: true), x, y)); continue
     }
-    // Band colour just outside the digits' area.
+    // Band colour between the digits' strokes (the middle of the number area, coloured pixels);
+    // just outside the area as the fallback — on bibs with a thin band that is paper or shirt.
     var hs: [Double] = [], ss: [Double] = [], vs: [Double] = []
+    for iy in 0..<10 { for ix in 0..<30 {
+      let fx = c.box.x0 + (c.box.x1 - c.box.x0) * (0.15 + 0.7 * (Double(ix) + 0.5) / 30)
+      let fy = c.box.y0 + (c.box.y1 - c.box.y0) * (0.3 + 0.4 * (Double(iy) + 0.5) / 10)
+      if let p = px.hsv(fx, fy), p.s > 0.2 { hs.append(p.h); ss.append(p.s); vs.append(p.v) }
+    } }
     let pad = 0.4 * (c.box.y1 - c.box.y0)
-    for k in 0..<60 {
+    for k in 0..<60 where hs.count < 30 {
       let fx = c.box.x0 + (c.box.x1 - c.box.x0) * (Double(k % 20) + 0.5) / 20
       let fy = k < 20 ? c.box.y0 - pad * 0.3 : k < 40 ? c.box.y1 + pad * 0.3 : c.box.cy
       let sampleX = k < 40 ? fx : (k % 2 == 0 ? c.box.x0 - pad * 0.3 : c.box.x1 + pad * 0.3)
@@ -402,11 +455,13 @@ func calibrateTemplate(_ start: BibTemplate, video: VideoSource, points: [(Doubl
   // Leave room for light and shade the samples didn't cover: bands in shadow get duller and
   // darker. The hue range stays tight — that's what separates one design from another.
   func r2(_ v: Double) -> Double { (v * 100).rounded() / 100 }
-  tpl.bandSatMin = r2(min(max((samples.map(\.sat).min() ?? 0.4) * 0.5, 0.2), 0.45))
+  let palestBand = samples.map(\.sat).min() ?? 0.4
+  tpl.bandSatMin = r2(min(max(palestBand * 0.5, 0.2), 0.45, palestBand - 0.04))
   tpl.bandValMin = r2(min(max((samples.map(\.val).min() ?? 0.3) * 0.5, 0.12), 0.35))
-  // Digit colour from the samples, with room for shade (never stricter than the defaults).
+  // Digit colour from the samples, with room for shade — but always below the band's
+  // saturation: a pale band (lavender purple on camera) must never count as white digits.
   let dSat = samples.compactMap(\.digitSat), dVal = samples.compactMap(\.digitVal)
-  tpl.digitSatMax = r2(min(0.5, max(0.40, (dSat.max() ?? 0.3) + 0.1)))
+  tpl.digitSatMax = r2(min(0.5, (dSat.max() ?? 0.3) + 0.1, tpl.bandSatMin - 0.02))
   tpl.digitValMin = r2(max(0.35, min(0.45, (dVal.min() ?? 0.55) - 0.1)))
   tpl.digitHeightMin = max(0.004, (samples.map(\.digitHeight).min() ?? 0.01) * 0.45)
   tpl.digitHeightMax = min(0.15, (samples.map(\.digitHeight).max() ?? 0.04) * 2.0)
@@ -415,6 +470,27 @@ func calibrateTemplate(_ start: BibTemplate, video: VideoSource, points: [(Doubl
   print(String(format: "calibrated on %d bib(s): band hue %.0f° ±%.0f, saturation ≥ %.2f, brightness ≥ %.2f, digits %.1f–%.1f%% of frame height",
                samples.count, tpl.bandHue, tpl.hueTolerance, tpl.bandSatMin, tpl.bandValMin, tpl.digitHeightMin * 100, tpl.digitHeightMax * 100))
   return tpl
+}
+
+/// Where digits end and band begins, in saturation, at a click on a bib number: the pixels
+/// around it fall into two groups — the digits (and white paper), barely saturated, and the band,
+/// more saturated — split in two by k-means. nil when there is no clear second colour.
+func splitDigitsFromBand(_ px: Pixels, x: Double, y: Double) -> Double? {
+  var sats: [Double] = []
+  for iy in 0..<16 { for ix in 0..<24 {
+    let fx = x - 0.025 + 0.05 * (Double(ix) + 0.5) / 24, fy = y - 0.02 + 0.04 * (Double(iy) + 0.5) / 16
+    if let p = px.hsv(fx, fy), p.v >= 0.25 { sats.append(p.s) }
+  } }
+  guard sats.count >= 40 else { return nil }
+  sats.sort()
+  var lo = sats[sats.count / 10], hi = sats[sats.count * 9 / 10]
+  for _ in 0..<10 {
+    let mid = (lo + hi) / 2
+    let a = sats.filter { $0 < mid }, b = sats.filter { $0 >= mid }
+    guard !a.isEmpty, !b.isEmpty else { return nil }
+    lo = a.reduce(0, +) / Double(a.count); hi = b.reduce(0, +) / Double(b.count)
+  }
+  return hi - lo >= 0.12 ? ((lo + hi) / 2 * 100).rounded() / 100 : nil
 }
 
 /// bibwatch finder <video> --template T --at t   → JSON: candidate areas + numbers read (for the viewer overlay).

@@ -35,7 +35,7 @@ type RunnerListItemProps = {
   isSelected: boolean;
   isCurrent: boolean;
   isUnregistered: boolean;
-  myTagLabels: string[];
+  myTags: string[];
   clockOffset: number | null;
   onSelect: (sighting: SightingDto) => void;
 };
@@ -68,7 +68,7 @@ export const RunnerListItem = memo(({
   isSelected,
   isCurrent,
   isUnregistered,
-  myTagLabels,
+  myTags,
   clockOffset,
   onSelect,
 }: RunnerListItemProps) => {
@@ -106,9 +106,12 @@ export const RunnerListItem = memo(({
           {readerTimeText && <span className="ml-1.5 text-xs text-muted-foreground">{readerTimeText}</span>}
         </span>
 
-        <span className="truncate text-xs text-muted-foreground">{detailTextOf(sighting)}</span>
+        <span className="truncate text-xs text-muted-foreground">
+          {detailTextOf(sighting)}
+          {sighting.manual && ' · added by hand'}
+        </span>
 
-        {(sighting.target || isUnregistered || myTagLabels.length > 0) && (
+        {(sighting.target || isUnregistered || myTags.length > 0) && (
           <span className="flex flex-wrap gap-1 pt-0.5">
             {sighting.target && (
               <Badge variant="destructive">Watchlist</Badge>
@@ -116,12 +119,13 @@ export const RunnerListItem = memo(({
             {isUnregistered && (
               <Badge className="bg-amber-500/15 text-amber-800">Not registered</Badge>
             )}
-            {myTagLabels.map((tagLabel) => (
+            {myTags.map((tag) => (
               <Badge
-                key={tagLabel}
-                variant="secondary"
+                key={tag}
+                variant="outline"
+                className="bg-background"
               >
-                {tagLabel}
+                {tag}
               </Badge>
             ))}
           </span>

@@ -2,6 +2,8 @@ import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, Up
 
 import { SightingEntity } from './SightingEntity';
 
+export type ManualRead = { bib: string; t: number; box: [number, number, number, number] };
+
 @Entity('videos')
 export class VideoEntity {
   @PrimaryGeneratedColumn()
@@ -31,6 +33,14 @@ export class VideoEntity {
     comment: 'Codes of your own typed tags for this video (tag → "104", …); presets 100-103 are fixed.',
   })
   tagCodes: Record<string, string> | null;
+
+  @Column({
+    name: 'manual_reads',
+    type: 'simple-json',
+    nullable: true,
+    comment: 'Bibs you added by clicking a person on the video: [{ bib, t, box }]. Merged into the scan like any read.',
+  })
+  manualReads: ManualRead[] | null;
 
   @Column({
     name: 'sightings_updated_at',

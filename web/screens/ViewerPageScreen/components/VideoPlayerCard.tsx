@@ -3,18 +3,36 @@
 import {
   RefObject,
   useEffect,
-  useRef
+  useRef,
+  useState
 } from 'react';
 
 import {
+  createLucideIcon,
   PauseIcon,
   PlayIcon,
   RectangleHorizontalIcon,
   RotateCcwIcon,
   RotateCwIcon,
+  SettingsIcon,
   SquareDashedIcon
 } from 'lucide-react';
 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
+import {
+  Kbd
+} from '@/components/ui/kbd';
 import {
   cn
 } from '@/lib/utils';
@@ -61,11 +79,40 @@ type VideoPlayerCardProps = {
   isOverlayShown: boolean;
   isPicking: boolean;
   isWide: boolean;
+  isMarkingFinishLine: boolean;
   onToggleOverlay: () => void;
   onToggleWide: () => void;
+  onToggleFinishLineMarking: () => void;
+  onCameraMoved: () => void;
   onSetClock: () => void;
-  onFrameClick: (point: FramePoint) => void;
+  onFrameClick: (point: FramePoint | null) => void;
+  isClickableAt: (point: FramePoint) => boolean;
 };
+
+// Lucide's square-dashed with a slash through it, like its other "-off" icons.
+const SquareDashedOffPaths = [
+  'M5 3a2 2 0 0 0-2 2',
+  'M19 3a2 2 0 0 1 2 2',
+  'M21 19a2 2 0 0 1-2 2',
+  'M5 21a2 2 0 0 1-2-2',
+  'M9 3h1',
+  'M9 21h1',
+  'M14 3h1',
+  'M14 21h1',
+  'M3 9v1',
+  'M21 9v1',
+  'M3 14v1',
+  'M21 14v1',
+  'm2 2 20 20',
+];
+
+const SquareDashedOffIcon = createLucideIcon(
+  'square-dashed-off',
+  SquareDashedOffPaths.map((d) => ['path', {
+    d,
+    key: d,
+  }]),
+);
 
 const controlButtonClassName = 'inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-bold text-white transition-colors hover:bg-white/15 disabled:opacity-40 [&_svg]:size-4';
 
@@ -97,12 +144,17 @@ export const VideoPlayerCard = ({
   isOverlayShown,
   isPicking,
   isWide,
+  isMarkingFinishLine,
   onToggleOverlay,
   onToggleWide,
+  onToggleFinishLineMarking,
+  onCameraMoved,
   onSetClock,
   onFrameClick,
+  isClickableAt,
 }: VideoPlayerCardProps) => {
   const frameRef = useRef<HTMLDivElement>(null);
+  const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
 
   useEffect(() => {
     const frame = frameRef.current;
@@ -127,17 +179,10 @@ export const VideoPlayerCard = ({
     };
   }, [controller]);
 
-  const nextPlaybackRate = PlaybackRates[(PlaybackRates.indexOf(playbackRate) + 1) % PlaybackRates.length] ?? 1;
-  const isCenterPlayShown = !isPlaying && !isPicking && duration > 0;
-
-  const handleCyclePlaybackRate = () => {
-    controller.setPlaybackRate(nextPlaybackRate);
-  };
-
   return (
     <div
       ref={frameRef}
-      className="relative aspect-video w-full overflow-hidden rounded-xl bg-neutral-900 shadow-sm overscroll-x-none"
+      className="group/player relative aspect-video w-full overflow-hidden rounded-xl bg-neutral-900 shadow-sm overscroll-x-none"
     >
       <video
         ref={onVideoElement}
@@ -152,6 +197,7 @@ export const VideoPlayerCard = ({
         isOverlayShown={isOverlayShown}
         isPicking={isPicking}
         onFrameClick={onFrameClick}
+        isClickableAt={isClickableAt}
       />
 
       <div className="absolute top-3 left-3">
@@ -162,18 +208,13 @@ export const VideoPlayerCard = ({
         />
       </div>
 
-      {isCenterPlayShown && (
-        <button
-          type="button"
-          aria-label="Play"
-          className="absolute top-1/2 left-1/2 flex size-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-neutral-950/55 text-white backdrop-blur-sm transition-colors hover:bg-neutral-950/75"
-          onClick={() => controller.play()}
-        >
-          <PlayIcon className="ml-1 size-7 fill-current" />
-        </button>
-      )}
-
-      <div className="absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-linear-to-t from-neutral-950/85 via-neutral-950/50 to-transparent px-3 pt-10 pb-2">
+      <div
+        className={cn(
+          'pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-linear-to-t from-neutral-950/85 via-neutral-950/50 to-transparent px-3 pt-10 pb-2 *:pointer-events-auto',
+          'opacity-0 transition-opacity duration-200 group-hover/player:opacity-100 has-focus-visible:opacity-100 pointer-coarse:opacity-100',
+          isToolsMenuOpen && 'opacity-100',
+        )}
+      >
         <PlayerScrubber
           controller={controller}
           clockOffset={clockOffset}
@@ -220,20 +261,67 @@ export const VideoPlayerCard = ({
           <button
             type="button"
             title={isOverlayShown ? 'Hide boxes and bib numbers' : 'Show boxes and bib numbers'}
-            className={cn(controlButtonClassName, !isOverlayShown && 'text-white/50')}
+            className={controlButtonClassName}
             onClick={onToggleOverlay}
           >
-            <SquareDashedIcon />
+            {isOverlayShown ? <SquareDashedIcon strokeWidth={2.5} /> : <SquareDashedOffIcon strokeWidth={2.5} />}
           </button>
 
-          <button
-            type="button"
-            title="Playback speed (L plays faster, K pauses)"
-            className={cn(controlButtonClassName, 'min-w-10 justify-center tabular-nums')}
-            onClick={handleCyclePlaybackRate}
+          <DropdownMenu
+            open={isToolsMenuOpen}
+            onOpenChange={setIsToolsMenuOpen}
           >
-            {playbackRate}×
-          </button>
+            <DropdownMenuTrigger
+              title="Video tools"
+              className={cn(controlButtonClassName, isMarkingFinishLine && 'text-sky-300')}
+            >
+              <SettingsIcon />
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent
+              side="top"
+              align="end"
+              className="w-56"
+            >
+              <DropdownMenuItem
+                title="Click the two ends of the finish line’s near edge"
+                onClick={onToggleFinishLineMarking}
+              >
+                {isMarkingFinishLine ? 'Stop drawing' : 'Draw finish line'}
+                <DropdownMenuShortcut>
+                  <Kbd>M</Kbd>
+                </DropdownMenuShortcut>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                title="Start a new camera position at the playhead, e.g. after the camera was bumped"
+                onClick={onCameraMoved}
+              >
+                Camera moved here
+                <DropdownMenuShortcut>
+                  <Kbd>S</Kbd>
+                </DropdownMenuShortcut>
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>Playback speed</DropdownMenuLabel>
+                <DropdownMenuRadioGroup
+                  value={playbackRate}
+                  onValueChange={(rate: number) => controller.setPlaybackRate(rate)}
+                >
+                  {PlaybackRates.map((rate) => (
+                    <DropdownMenuRadioItem
+                      key={rate}
+                      value={rate}
+                      className="tabular-nums"
+                    >
+                      {rate}×
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <button
             type="button"

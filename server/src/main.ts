@@ -66,18 +66,11 @@ async function bootstrap() {
     setHeaders: noStore,
   });
 
-  app.useStaticAssets(configService.ViewerFolder, {
-    index: 'index.html',
-    etag: false,
-    lastModified: false,
-    setHeaders: noStore,
-  });
-
   const port = configService.Port;
 
   // 127.0.0.1 only, and no CORS: the API starts processes and writes files on this Mac.
   await app.listen(port, '127.0.0.1', () => {
-    console.log(`viewer: http://127.0.0.1:${port}/   media: ${mediaFolder}`);
+    console.log(`api: http://127.0.0.1:${port}/api   media: ${mediaFolder}`);
   });
 }
 bootstrap();

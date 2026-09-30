@@ -1,11 +1,8 @@
 import {
-  AnyDirectionValue,
-  RunnerListFilter,
-  SightingLabel
+  AnyDirectionValue
 } from '@basekm/@shared/constants';
 import {
-  allTagsOf,
-  currentSightingLabel
+  allTagsOf
 } from '@basekm/@shared/utils/sightingTags';
 import {
   SightingDto,
@@ -13,7 +10,6 @@ import {
 } from '@basekm/dtos';
 
 export type RunnerListFilters = {
-  filter: RunnerListFilter;
   search: string;
   direction: string;
 };
@@ -25,24 +21,6 @@ type FilterRunnersParams = {
   registered?: string[];
 };
 
-const matchesFilter = (sighting: SightingDto, filter: RunnerListFilter) => {
-  const isFinished = currentSightingLabel(sighting) === SightingLabel.Crossed;
-
-  if (filter === RunnerListFilter.Finished) {
-    return isFinished;
-  }
-
-  if (filter === RunnerListFilter.Watchlist) {
-    return sighting.target;
-  }
-
-  if (filter === RunnerListFilter.NotFinished) {
-    return !isFinished;
-  }
-
-  return true;
-};
-
 export const filterRunners = ({
   sightings,
   filters,
@@ -52,10 +30,6 @@ export const filterRunners = ({
   const search = filters.search.trim().toLowerCase();
 
   return sightings.filter((sighting) => {
-    if (!matchesFilter(sighting, filters.filter)) {
-      return false;
-    }
-
     if (filters.direction !== AnyDirectionValue && sighting.direction !== filters.direction) {
       return false;
     }

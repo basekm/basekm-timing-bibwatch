@@ -1,0 +1,24 @@
+# video: GX021737.MP4
+# range: 00:02:30-00:03:00
+# checked by hand 2026-09-30
+# 0323 removed after review: it is 3236 with the last digit cut off (close-ups at 2:31–2:35)
+# 0314? unsure after review: "314" with the last digit hidden, read where 3142 is (2:34–2:40) — likely 3142
+3142
+3315
+5206
+0314?
+5109
+3236
+3156
+1016
+1015
+3043
+3125
+3127
+5204
+5360
+5194
+5359
+5159
+5195
+5335

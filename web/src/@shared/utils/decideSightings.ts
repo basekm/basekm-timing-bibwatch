@@ -41,7 +41,10 @@ type TrackPoint = {
 };
 
 const SameRunnerGapSeconds = 10;
-const SameCrossingSeconds = 1;
+// Same bib: a misread's reads sit within this time and distance (bib widths/heights) of the
+// stronger number's reads. Mirrors SameBib in Sources/bibwatch/Scan.swift.
+const SameBibSeconds = 0.6;
+const SameBibDistance = 0.75;
 const FollowDistance = 0.1;
 const DefaultScanSettings: ScanSettingsDto = {
   pad: 4,
@@ -374,38 +377,186 @@ const evaluateWindow = ({
   return sighting;
 };
 
-const markDuplicateCrossings = (sightings: SightingDto[]) => {
-  const crossed = sightings
-    .filter((sighting) => sighting.label === SightingLabel.Crossed && sighting.cross !== null)
-    .sort((a, b) => (a.cross as number) - (b.cross as number));
+// A runner is listed only if their number was read in full at least once: 3-digit fragments
+// alone are almost always a covered part of someone's bib or a logo. Mirrors dropFragmentOnly
+// in Sources/bibwatch/Scan.swift.
+const dropFragmentOnly = ({
+  sightings,
+  frames,
+  pad,
+}: {
+  sightings: SightingDto[];
+  frames: DetectionFrameDto[];
+  pad: number;
+}) => {
+  const fullReadTimes = new Map<string, number[]>();
+  frames.forEach((frame) => {
+    frame.bibs.forEach((read) => {
+      if (!read.fragment) {
+        const times = fullReadTimes.get(read.bib) ?? [];
+        times.push(frame.t);
+        fullReadTimes.set(read.bib, times);
+      }
+    });
+  });
 
-  for (let index = 0; index < crossed.length;) {
-    const group = [crossed[index]];
-    while (
-      index + group.length < crossed.length
-      && (crossed[index + group.length].cross as number) - (group[group.length - 1].cross as number) <= SameCrossingSeconds
-    ) {
-      group.push(crossed[index + group.length]);
+  return sightings.filter((sighting) => sighting.label === SightingLabel.NeedsScan
+    || (fullReadTimes.get(sighting.bib) ?? []).some((time) => time >= sighting.from - pad && time <= sighting.to + pad));
+};
+
+type TimedRead = {
+  t: number;
+  box: Box;
+  fragment: boolean;
+};
+
+const isMisread = ({
+  bib,
+  of,
+  fragment,
+}: {
+  bib: string;
+  of: string;
+  fragment: boolean;
+}) => {
+  if (!fragment && bib.length === of.length) {
+    const diff = [...bib].map((_, index) => index).filter((index) => bib[index] !== of[index]);
+    if (diff.length === 1) {
+      return true;
     }
 
-    if (group.length > 1) {
-      const fullReadsOf = (sighting: SightingDto) => sighting.fullReads ?? 0;
-      const readsOf = (sighting: SightingDto) => sighting.reads ?? 0;
-      const kept = group.reduce((best, sighting) => {
-        const hasMoreFullReads = fullReadsOf(sighting) > fullReadsOf(best);
-        const winsTie = fullReadsOf(sighting) === fullReadsOf(best) && readsOf(sighting) > readsOf(best);
-        return hasMoreFullReads || winsTie ? sighting : best;
+    return diff.length === 2 && diff[1] === diff[0] + 1 && bib[diff[0]] === of[diff[1]] && bib[diff[1]] === of[diff[0]];
+  }
+
+  if (!fragment) {
+    return false;
+  }
+
+  const raw = bib.replace(/^0+/, '');
+  if (raw.length < 2 || raw.length >= of.length) {
+    return false;
+  }
+
+  for (let start = 0; start <= of.length - raw.length; start++) {
+    const different = [...raw].filter((digit, index) => digit !== of[start + index]).length;
+    if (different <= 1) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+const compareStrength = (a: SightingDto, b: SightingDto) => {
+  const byFullReads = (a.fullReads ?? 0) - (b.fullReads ?? 0);
+  if (byFullReads) {
+    return byFullReads;
+  }
+
+  const byReads = (a.reads ?? 0) - (b.reads ?? 0);
+  if (byReads) {
+    return byReads;
+  }
+
+  if (a.bib !== b.bib) {
+    return a.bib < b.bib ? -1 : 1;
+  }
+
+  return b.from - a.from;
+};
+
+const isSameBibSpot = (a: Box, b: Box) => {
+  return Math.abs(boxCenterX(a) - boxCenterX(b)) <= SameBibDistance * Math.max(a[2] - a[0], b[2] - b[0])
+    && Math.abs(boxCenterY(a) - boxCenterY(b)) <= SameBibDistance * Math.max(a[3] - a[1], b[3] - b[1]);
+};
+
+const foldMisreads = ({
+  sightings,
+  frames,
+  segments,
+  pad,
+}: {
+  sightings: SightingDto[];
+  frames: DetectionFrameDto[];
+  segments: CameraSegmentDto[];
+  pad: number;
+}) => {
+  const readsByBib = new Map<string, TimedRead[]>();
+  frames.forEach((frame) => {
+    frame.bibs.forEach((read) => {
+      const reads = readsByBib.get(read.bib) ?? [];
+      reads.push({
+        t: frame.t,
+        box: read.box,
+        fragment: read.fragment === true,
       });
+      readsByBib.set(read.bib, reads);
+    });
+  });
 
-      group
-        .filter((sighting) => sighting !== kept)
-        .forEach((sighting) => {
-          sighting.label = SightingLabel.Duplicate;
-          sighting.note = `same crossing as ${kept.bib} (read as ${sighting.bib})`;
-        });
+  const readsOf = (sighting: SightingDto) => (readsByBib.get(sighting.bib) ?? [])
+    .filter((read) => read.t >= sighting.from - pad && read.t <= sighting.to + pad);
+  // A bib belongs to one runner: every full read of it in this camera position is evidence,
+  // including fine-pass reads outside its own sighting.
+  const fullReadsOf = (sighting: SightingDto) => {
+    const segment = segments.find((candidate) => candidate.index === sighting.segment);
+    if (!segment) {
+      return [];
     }
 
-    index += group.length;
+    return (readsByBib.get(sighting.bib) ?? []).filter((read) => !read.fragment && read.t >= segment.from && read.t < segment.to);
+  };
+
+  for (const sighting of [...sightings].sort(compareStrength)) {
+    if (sighting.label === SightingLabel.Duplicate) {
+      continue;
+    }
+
+    const mine = readsOf(sighting);
+    if (!mine.length) {
+      continue;
+    }
+
+    const isFragment = mine.filter((read) => read.fragment).length * 2 > mine.length;
+    const myFullReads = fullReadsOf(sighting).length;
+    const owners = sightings.filter((other) => other !== sighting
+      && other.label !== SightingLabel.Duplicate
+      && other.segment === sighting.segment
+      && isMisread({
+        bib: sighting.bib,
+        of: other.bib,
+        fragment: isFragment,
+      })
+      && fullReadsOf(other).length > myFullReads);
+
+    // A misread spread over several runners of a group still counts once per read.
+    const together = new Map<SightingDto, number>();
+    let onAny = 0;
+    mine.forEach((read) => {
+      let hit = false;
+      owners.forEach((owner) => {
+        const sitsOnOwner = fullReadsOf(owner).some((theirs) => Math.abs(theirs.t - read.t) <= SameBibSeconds
+          && isSameBibSpot(theirs.box, read.box));
+        if (sitsOnOwner) {
+          together.set(owner, (together.get(owner) ?? 0) + 1);
+          hit = true;
+        }
+      });
+      if (hit) {
+        onAny += 1;
+      }
+    });
+
+    if (onAny * 2 < mine.length || !together.size) {
+      continue;
+    }
+
+    const owner = [...together.keys()].reduce((best, candidate) => {
+      const byTogether = (together.get(candidate) as number) - (together.get(best) as number);
+      return byTogether > 0 || (byTogether === 0 && compareStrength(candidate, best) > 0) ? candidate : best;
+    });
+    sighting.label = SightingLabel.Duplicate;
+    sighting.note = `same runner as ${owner.bib} (read as ${sighting.bib})`;
   }
 
   return sightings;
@@ -440,12 +591,22 @@ export const decideSightings = ({
     coarseHits,
     segments,
   });
+  const scanSettings = settings ?? DefaultScanSettings;
   const evaluated = windows.map((window) => evaluateWindow({
     window,
     frames,
     targets,
-    settings: settings ?? DefaultScanSettings,
+    settings: scanSettings,
   }));
 
-  return sortSightingsByTime(markDuplicateCrossings(evaluated));
+  return sortSightingsByTime(foldMisreads({
+    sightings: dropFragmentOnly({
+      sightings: evaluated,
+      frames,
+      pad: scanSettings.pad,
+    }),
+    frames,
+    segments,
+    pad: scanSettings.pad,
+  }));
 };

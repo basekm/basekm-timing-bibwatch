@@ -1,0 +1,48 @@
+{
+ "video": "GX021737.MP4",
+ "duration": 225.15826666666666,
+ "segments": [
+  {
+   "from": 0,
+   "index": 1,
+   "kind": "moving",
+   "refTime": 0,
+   "to": 9
+  },
+  {
+   "from": 9,
+   "index": 2,
+   "kind": "fixed",
+   "refTime": 56,
+   "to": 90
+  },
+  {
+   "from": 90,
+   "index": 3,
+   "kind": "moving",
+   "refTime": 90,
+   "to": 98
+  },
+  {
+   "from": 98,
+   "index": 4,
+   "kind": "fixed",
+   "refTime": 108,
+   "to": 126
+  },
+  {
+   "from": 126,
+   "index": 5,
+   "kind": "moving",
+   "refTime": 126,
+   "to": 163
+  },
+  {
+   "from": 163,
+   "index": 6,
+   "kind": "fixed",
+   "refTime": 215,
+   "to": 225.15826666666666
+  }
+ ]
+}

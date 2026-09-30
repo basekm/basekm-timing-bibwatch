@@ -14,8 +14,6 @@ import {
 } from '../utils/VideoPlaybackController';
 
 type ViewerShortcutActions = {
-  onPreviousRunner: () => void;
-  onNextRunner: () => void;
   onToggleFinishLineMarking: () => void;
   onSplitCameraPosition: () => void;
   onToggleTag: (tag: string) => void;
@@ -72,16 +70,6 @@ export const useViewerShortcuts = ({
         event.preventDefault();
         const direction = event.key === 'ArrowLeft' ? -1 : 1;
         controller.step(direction * (event.shiftKey ? 1 : 0.1));
-        return;
-      }
-
-      if (event.key === '[') {
-        current.onPreviousRunner();
-        return;
-      }
-
-      if (event.key === ']') {
-        current.onNextRunner();
         return;
       }
 

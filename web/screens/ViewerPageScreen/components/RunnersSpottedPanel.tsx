@@ -7,8 +7,8 @@ import {
 } from 'react';
 
 import {
-  DownloadIcon,
-  SearchIcon
+  SearchIcon,
+  SlidersHorizontalIcon
 } from 'lucide-react';
 
 import {
@@ -27,6 +27,11 @@ import {
   NativeSelectOption
 } from '@/components/ui/native-select';
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger
+} from '@/components/ui/popover';
+import {
   cn
 } from '@/lib/utils';
 
@@ -34,21 +39,14 @@ import {
   AnyDirectionValue,
   RunnerDirection,
   RunnerDirectionLabels,
-  RunnerListFilter,
-  RunnerListFilterLabels,
   RunnerListScope
 } from '@basekm/@shared/constants';
 import {
-  formatVideoTime
-} from '@basekm/@shared/utils/formatTime';
-import {
   isUnregistered,
-  labelTag,
   myTagsOf,
   sightingKey
 } from '@basekm/@shared/utils/sightingTags';
 import {
-  CameraSegmentDto,
   SightingDto,
   SightingSearchResultDto,
   TagsBySightingKey
@@ -69,14 +67,12 @@ import {
 } from './RunnerTagEditor';
 
 type RunnersSpottedPanelProps = {
-  totalCount: number;
   visibleSightings: SightingDto[];
   filters: RunnerListFilters;
   onFiltersChange: (filters: RunnerListFilters) => void;
   scope: RunnerListScope;
   onScopeChange: (scope: RunnerListScope) => void;
   isServerAvailable: boolean;
-  currentSegment: CameraSegmentDto | null;
   currentTime: number;
   selectedKey: string | null;
   tags: TagsBySightingKey;
@@ -84,24 +80,20 @@ type RunnersSpottedPanelProps = {
   clockOffset: number | null;
   onSelectSighting: (sighting: SightingDto) => void;
   onToggleTag: (tag: string) => void;
-  onExportCsv: () => void;
-  onMarkFinishLine: () => void;
+  onRemoveRunner: (sighting: SightingDto) => void;
   onOpenSearchResult: (result: SightingSearchResultDto) => void;
 };
 
-const FilterOrder = [RunnerListFilter.All, RunnerListFilter.Finished, RunnerListFilter.Watchlist, RunnerListFilter.NotFinished];
 const DirectionOrder = [RunnerDirection.Toward, RunnerDirection.Away, RunnerDirection.Still];
 const NearbySeconds = 4;
 
 export const RunnersSpottedPanel = ({
-  totalCount,
   visibleSightings,
   filters,
   onFiltersChange,
   scope,
   onScopeChange,
   isServerAvailable,
-  currentSegment,
   currentTime,
   selectedKey,
   tags,
@@ -109,17 +101,13 @@ export const RunnersSpottedPanel = ({
   clockOffset,
   onSelectSighting,
   onToggleTag,
-  onExportCsv,
-  onMarkFinishLine,
+  onRemoveRunner,
   onOpenSearchResult,
 }: RunnersSpottedPanelProps) => {
   const listRef = useRef<HTMLDivElement>(null);
   const isAllVideos = scope === RunnerListScope.AllVideos;
-  const isFinishLineMissing = currentSegment !== null && !currentSegment.mat;
-  const segmentText = currentSegment
-    ? `Camera position ${currentSegment.index} · ${formatVideoTime(currentSegment.from)}–${formatVideoTime(currentSegment.to)}`
-    : 'No camera positions yet';
   const searchPlaceholder = isAllVideos ? 'Bib number or tag, in every video' : 'Search by bib number';
+  const isFiltered = isAllVideos || filters.direction !== AnyDirectionValue;
 
   useEffect(() => {
     if (!selectedKey) {
@@ -141,32 +129,8 @@ export const RunnersSpottedPanel = ({
 
   return (
     <Card className="h-full min-h-0 gap-0 py-0">
-      <div className="flex flex-col gap-3 border-b p-4">
-        <div className="flex flex-col gap-0.5">
-          <h2 className="text-base font-bold">Runners spotted</h2>
-          <span className="text-xs font-bold text-muted-foreground">{totalCount} found</span>
-          <span className="text-xs text-muted-foreground">{segmentText}</span>
-        </div>
-
-        <div className="flex flex-wrap gap-1.5">
-          {FilterOrder.map((filter) => (
-            <button
-              key={filter}
-              type="button"
-              className={cn(
-                'h-8 rounded-full border px-3 text-sm font-semibold transition-colors hover:bg-muted',
-                filters.filter === filter && 'border-foreground bg-foreground text-background hover:bg-foreground/90',
-              )}
-              onClick={() => updateFilters({
-                filter,
-              })}
-            >
-              {RunnerListFilterLabels[filter]}
-            </button>
-          ))}
-        </div>
-
-        <InputGroup className="h-10 bg-muted/60">
+      <div className="flex items-center gap-2 border-b p-4">
+        <InputGroup className="h-10 flex-1 bg-muted/60">
           <InputGroupAddon>
             <SearchIcon />
           </InputGroupAddon>
@@ -180,72 +144,75 @@ export const RunnersSpottedPanel = ({
           />
         </InputGroup>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {isServerAvailable && (
-            <div className="flex rounded-md bg-muted p-0.5">
-              <button
-                type="button"
-                className={cn('h-7 rounded px-2.5 text-xs font-semibold text-muted-foreground', !isAllVideos && 'bg-background text-foreground shadow-xs')}
-                onClick={() => onScopeChange(RunnerListScope.ThisVideo)}
-              >
-                This video
-              </button>
-              <button
-                type="button"
-                className={cn('h-7 rounded px-2.5 text-xs font-semibold text-muted-foreground', isAllVideos && 'bg-background text-foreground shadow-xs')}
-                onClick={() => onScopeChange(RunnerListScope.AllVideos)}
-              >
-                All videos
-              </button>
-            </div>
-          )}
+        <Popover>
+          <PopoverTrigger
+            render={(
+              <Button
+                variant="outline"
+                size="icon-lg"
+                aria-label="Search filters"
+                title="Search filters"
+                className="relative shrink-0"
+              />
+            )}
+          >
+            <SlidersHorizontalIcon />
+            {isFiltered && (
+              <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-sky-500" />
+            )}
+          </PopoverTrigger>
 
-          {!isAllVideos && (
-            <NativeSelect
-              size="sm"
-              value={filters.direction}
-              aria-label="Movement"
-              onChange={(event) => updateFilters({
-                direction: event.target.value,
-              })}
-            >
-              <NativeSelectOption value={AnyDirectionValue}>Any movement</NativeSelectOption>
-              {DirectionOrder.map((direction) => (
-                <NativeSelectOption
-                  key={direction}
-                  value={direction}
+          <PopoverContent
+            align="end"
+            className="w-64 gap-3"
+          >
+            {!isAllVideos && (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-bold text-muted-foreground">Movement</span>
+                <NativeSelect
+                  className="w-full"
+                  value={filters.direction}
+                  aria-label="Movement"
+                  onChange={(event) => updateFilters({
+                    direction: event.target.value,
+                  })}
                 >
-                  {RunnerDirectionLabels[direction]}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-          )}
+                  <NativeSelectOption value={AnyDirectionValue}>Any movement</NativeSelectOption>
+                  {DirectionOrder.map((direction) => (
+                    <NativeSelectOption
+                      key={direction}
+                      value={direction}
+                    >
+                      {RunnerDirectionLabels[direction]}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              </div>
+            )}
 
-          {!isAllVideos && (
-            <Button
-              variant="outline"
-              size="sm"
-              title="Download every runner with its tags as a CSV"
-              onClick={onExportCsv}
-            >
-              <DownloadIcon data-icon="inline-start" />
-              CSV
-            </Button>
-          )}
-        </div>
-
-        {isFinishLineMissing && !isAllVideos && (
-          <div className="rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-900">
-            No finish line marked for this camera position yet.{' '}
-            <button
-              type="button"
-              className="font-semibold text-blue-700 underline underline-offset-2"
-              onClick={onMarkFinishLine}
-            >
-              Mark finish line
-            </button>
-          </div>
-        )}
+            {isServerAvailable && (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-bold text-muted-foreground">Search in</span>
+                <div className="flex w-fit rounded-md bg-muted p-0.5">
+                  <button
+                    type="button"
+                    className={cn('h-7 rounded px-2.5 text-xs font-semibold text-muted-foreground', !isAllVideos && 'bg-background text-foreground shadow-xs')}
+                    onClick={() => onScopeChange(RunnerListScope.ThisVideo)}
+                  >
+                    This video
+                  </button>
+                  <button
+                    type="button"
+                    className={cn('h-7 rounded px-2.5 text-xs font-semibold text-muted-foreground', isAllVideos && 'bg-background text-foreground shadow-xs')}
+                    onClick={() => onScopeChange(RunnerListScope.AllVideos)}
+                  >
+                    All videos
+                  </button>
+                </div>
+              </div>
+            )}
+          </PopoverContent>
+        </Popover>
       </div>
 
       <div
@@ -271,10 +238,6 @@ export const RunnersSpottedPanel = ({
             tags,
             sighting,
           });
-          const myTagLabels = myTags.map((tag) => labelTag({
-            tags,
-            tag,
-          }));
           const isRunnerUnregistered = isUnregistered({
             sighting,
             registered,
@@ -288,7 +251,7 @@ export const RunnersSpottedPanel = ({
                   isSelected={isSelected}
                   isCurrent={isCurrent}
                   isUnregistered={isRunnerUnregistered}
-                  myTagLabels={myTagLabels}
+                  myTags={myTags}
                   clockOffset={clockOffset}
                   onSelect={onSelectSighting}
                 />
@@ -297,9 +260,9 @@ export const RunnersSpottedPanel = ({
               {isSelected && (
                 <RunnerTagEditor
                   sighting={sighting}
-                  tags={tags}
                   myTags={myTags}
                   onToggleTag={onToggleTag}
+                  onRemove={() => onRemoveRunner(sighting)}
                 />
               )}
             </Fragment>
