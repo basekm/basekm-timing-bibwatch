@@ -30,7 +30,7 @@ async function bootstrap() {
     throw new Error('MEDIA_FOLDER is not set: the folder with the videos (see server/.env.example)');
   }
 
-  // Template artwork arrives as a base64 data URL, well over the 100 kB default.
+  // A long video's sightings can be well over the 100 kB default body size.
   app.useBodyParser('json', { limit: '50mb' });
 
   app.setGlobalPrefix('api');
@@ -53,7 +53,7 @@ async function bootstrap() {
     /\.sqlite(-wal|-shm|-journal)?$/i.test(req.path) ? res.sendStatus(404) : next(),
   );
 
-  // Videos, scans and templates. express.static streams files and answers Range requests, so video
+  // Videos and scans. express.static streams files and answers Range requests, so video
   // seeking works. It rejects "../" but follows symlinks placed in the media folder.
   app.useStaticAssets(mediaFolder, {
     ...videoReadOptions,

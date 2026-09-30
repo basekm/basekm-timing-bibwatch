@@ -130,7 +130,7 @@ export const allTagsOf = ({
     tag,
   }));
 
-  return [autoTagOf(sighting), unregisteredTag, sighting.zone, sighting.direction, sighting.template, ...myTags]
+  return [autoTagOf(sighting), unregisteredTag, sighting.zone, sighting.direction, ...myTags]
     .filter((tag): tag is string => Boolean(tag));
 };
 

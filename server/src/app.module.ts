@@ -7,7 +7,6 @@ import { HealthModule } from './health/HealthModule';
 import { MediaModule } from './media/MediaModule';
 import { ScanModule } from './scans/ScanModule';
 import { SightingModule } from './sightings/SightingModule';
-import { TemplateModule } from './templates/TemplateModule';
 
 @Module({
   imports: [
@@ -18,7 +17,6 @@ import { TemplateModule } from './templates/TemplateModule';
     MediaModule,
     ScanModule,
     SightingModule,
-    TemplateModule,
   ],
   controllers: [],
   providers: [],

@@ -1,6 +1,5 @@
 import {
-  SightingSearchQueryDto,
-  TemplateFinderQueryDto
+  SightingSearchQueryDto
 } from '@basekm/dtos';
 import {
   PayloadOnly
@@ -30,16 +29,6 @@ class ApiQueryKeysSightings {
   }
 }
 
-class ApiQueryKeysTemplates {
-  static getAll() {
-    return ['templates'];
-  }
-
-  static find(data: PayloadOnly<TemplateFinderQueryDto>) {
-    return ['templates', 'finder', data.video, data.t, data.templates.join(',')];
-  }
-}
-
 export class ApiQueryKeys {
   static get Media() {
     return ApiQueryKeysMedia;
@@ -55,9 +44,5 @@ export class ApiQueryKeys {
 
   static get Sightings() {
     return ApiQueryKeysSightings;
-  }
-
-  static get Templates() {
-    return ApiQueryKeysTemplates;
   }
 }

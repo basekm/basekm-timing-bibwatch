@@ -49,8 +49,6 @@ export class SightingEntity {
   @Column({ type: 'varchar', nullable: true, comment: 'toward | away | still' })
   direction: string | null;
 
-  @Column({ type: 'varchar', nullable: true, comment: 'Name of the bib template (design) that read it.' })
-  template: string | null;
 
   @Column({ default: false })
   target: boolean;

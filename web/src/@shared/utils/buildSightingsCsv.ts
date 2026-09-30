@@ -17,7 +17,7 @@ import {
   myTagsOf
 } from './sightingTags';
 
-const CsvHeader = ['bib', 'target', 'registered', 'design', 'segment', 'seen_from', 'seen_to', 'seen_from_reader', 'tag_code', 'tag', 'crossed_at', 'crossed_at_reader', 'zone', 'direction', 'my_tags', 'note'];
+const CsvHeader = ['bib', 'target', 'registered', 'segment', 'seen_from', 'seen_to', 'seen_from_reader', 'tag_code', 'tag', 'crossed_at', 'crossed_at_reader', 'zone', 'direction', 'my_tags', 'note'];
 
 const quoteCsv = (value: unknown) => {
   if (value === null || value === undefined) {
@@ -76,7 +76,6 @@ export const buildSightingsCsv = ({
       sighting.bib,
       sighting.target ? 'yes' : '',
       registeredColumn,
-      sighting.template || '',
       sighting.segment,
       formatClockTime(sighting.from),
       formatClockTime(sighting.to),

@@ -6,9 +6,6 @@ let usage = """
 
     bibwatch segments <video> <segments.json>       find camera moves; mark mats in the viewer
     bibwatch scan <video> <outDir> [options]         find bibs, track runners, detect crossings
-    bibwatch template <design.png> <template.json>  measure a bib design (colours, digits)
-    bibwatch calibrate <template.json> <video> --at t,x,y …   tune it on clear bibs in the footage
-    bibwatch finder <video> --template T --at t     what the template finds in one frame (JSON)
     bibwatch review <outDir> <scanDir>… --video V   page to check every bib read by hand → answer key
     bibwatch score <key.txt> <scanDir>…             compare scans with an answer key
     bibwatch mosaic <video> <out.png> --at t        what "people only" reads in one frame
@@ -23,9 +20,6 @@ arguments.removeFirst()
 switch command {
 case "segments": runSegments(arguments)
 case "scan": runScan(arguments)
-case "template": runTemplate(arguments)
-case "calibrate": runCalibrate(arguments)
-case "finder": runFinder(arguments)
 case "review": runReview(arguments)
 case "score": runScore(arguments)
 case "mosaic": runMosaic(arguments)

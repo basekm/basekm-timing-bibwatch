@@ -15,7 +15,6 @@ export class SightingSearchResultDto extends AppBaseDto {
   autoTag: string;
   zone: string | null;
   direction: string | null;
-  template: string | null;
   target: boolean;
   registered: boolean | null;
   tags: string[];

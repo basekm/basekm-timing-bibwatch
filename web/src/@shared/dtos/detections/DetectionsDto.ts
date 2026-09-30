@@ -25,7 +25,6 @@ export class BibReadDto extends AppBaseDto {
   box: Box;
   confidence: number;
   fragment?: boolean;
-  template?: string | null;
   manual?: boolean;
 }
 
@@ -46,7 +45,6 @@ export class SightingDto extends AppBaseDto {
   note: string;
   zone: string | null;
   direction: string | null;
-  template?: string | null;
   registered?: boolean | null;
   reads?: number;
   fullReads?: number;

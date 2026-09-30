@@ -43,16 +43,13 @@ export type OverlaySettings = {
 type ViewerMoreMenuProps = {
   isEventAvailable: boolean;
   bibNumbersSummary: string;
-  bibDesignsSummary: string;
   hasVideo: boolean;
   canClearScans: boolean;
   isPeopleFirst: boolean;
-  hasBibDesignsInUse: boolean;
   overlaySettings: OverlaySettings;
   swipeSpeed: number;
   onOpenVideoFile: () => void;
   onOpenBibNumbers: () => void;
-  onOpenBibDesigns: () => void;
   onSetRaceClock: () => void;
   onExportCsv: () => void;
   onDownloadSegments: () => void;
@@ -79,16 +76,13 @@ const sectionLabelClassName = 'px-2 pt-2 pb-1 text-xs font-bold tracking-wider t
 export const ViewerMoreMenu = ({
   isEventAvailable,
   bibNumbersSummary,
-  bibDesignsSummary,
   hasVideo,
   canClearScans,
   isPeopleFirst,
-  hasBibDesignsInUse,
   overlaySettings,
   swipeSpeed,
   onOpenVideoFile,
   onOpenBibNumbers,
-  onOpenBibDesigns,
   onSetRaceClock,
   onExportCsv,
   onDownloadSegments,
@@ -139,13 +133,6 @@ export const ViewerMoreMenu = ({
                 <span>Bib numbers…</span>
                 <span className="text-xs text-muted-foreground">{bibNumbersSummary}</span>
               </DropdownMenuItem>
-              <DropdownMenuItem
-                className="flex-col items-start gap-0.5"
-                onClick={onOpenBibDesigns}
-              >
-                <span>Bib designs…</span>
-                <span className="text-xs text-muted-foreground">{bibDesignsSummary}</span>
-              </DropdownMenuItem>
             </DropdownMenuGroup>
           </>
         )}
@@ -178,15 +165,12 @@ export const ViewerMoreMenu = ({
         <DropdownMenuGroup>
           <DropdownMenuLabel className={sectionLabelClassName}>Scanning</DropdownMenuLabel>
           <DropdownMenuCheckboxItem
-            checked={isPeopleFirst && !hasBibDesignsInUse}
-            disabled={hasBibDesignsInUse}
+            checked={isPeopleFirst}
             closeOnClick={false}
-            title={hasBibDesignsInUse
-              ? 'Off while bib designs are ticked: the designs choose where to read. Untick them in Bib designs… to use this.'
-              : 'Experimental: find people first and read bibs only on their torsos. Changing it scans this video again from the start.'}
+            title="On by default: reads bibs only on the people found — finds more runners and is usually faster. Untick to read the whole frame (a few fewer misreads). Changing it scans this video again from the start."
             onCheckedChange={onPeopleFirstChange}
           >
-            Only look for people (faster)
+            Only look for people
           </DropdownMenuCheckboxItem>
         </DropdownMenuGroup>
 

@@ -45,8 +45,8 @@ export class SightingService {
 
       const insert = db.prepare(`
         INSERT INTO sightings (video_id, bib, sighting_key, from_time, to_time, cross_time, label,
-          zone, direction, template, target, registered, reads, note)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+          zone, direction, target, registered, reads, note)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
       for (const sighting of sightings) {
         insert.run(
           videoId,
@@ -58,7 +58,6 @@ export class SightingService {
           sighting.label,
           sighting.zone ?? null,
           sighting.direction ?? null,
-          sighting.template ?? null,
           sighting.target ? 1 : 0,
           sighting.registered == null ? null : sighting.registered ? 1 : 0,
           sighting.reads ?? 0,
@@ -144,7 +143,6 @@ export class SightingService {
           autoTag: auto ? `${auto.code} ${auto.name}` : label,
           zone: sighting.zone,
           direction: sighting.direction,
-          template: sighting.template,
           target: sighting.target,
           registered: sighting.registered,
           tags: tags.get(`${sighting.videoId}|${sighting.sightingKey}`) ?? [],

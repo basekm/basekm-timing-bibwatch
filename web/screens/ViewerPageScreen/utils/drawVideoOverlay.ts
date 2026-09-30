@@ -17,14 +17,8 @@ import {
   CameraSegmentDto,
   DetectionFrameDto,
   SightingDto,
-  TemplateFinderResponseDto,
-  TemplateGetResponseDto
 } from '@basekm/dtos';
 
-import {
-  BibDesignPickMode,
-  BibDesignPicking
-} from '../hooks/useBibDesigns';
 import {
   FramePoint
 } from '../hooks/useViewerSession';
@@ -39,9 +33,6 @@ export type OverlayScene = {
   isBibsShown: boolean;
   isEveryBibShown: boolean;
   finishLinePoints: FramePoint[] | null;
-  picking: BibDesignPicking | null;
-  finder: (TemplateFinderResponseDto & { t: number }) | null;
-  templates: TemplateGetResponseDto[];
   clockOffset: number | null;
   swipeFlashUntil: number;
 };
@@ -245,50 +236,6 @@ export const drawVideoOverlay = ({
       centerY: rect.y + rect.height / 2,
       background: OverlayColors.Shade,
       fontSize: 18,
-    });
-  }
-
-  const isFinderFrame = scene.finder !== null && Math.abs(scene.finder.t - time) < 0.05;
-  if (isFinderFrame && scene.finder) {
-    context.save();
-    context.setLineDash([6, 4]);
-    context.lineWidth = 2;
-    scene.finder.candidates.forEach((candidate) => {
-      const template = scene.templates.find((item) => item.name === candidate.template);
-      context.strokeStyle = template?.hue !== null && template?.hue !== undefined ? `hsl(${template.hue}, 90%, 60%)` : OverlayColors.FinishLine;
-      drawBox({
-        context,
-        rect,
-        box: candidate.box,
-      });
-    });
-    context.restore();
-
-    scene.finder.reads.forEach((read) => {
-      const [left, top] = toPixels(rect, read.box[0], read.box[1]);
-      drawPill({
-        context,
-        text: `${read.bib} · ${read.template}`,
-        centerX: left + 40,
-        centerY: top - 14,
-        background: OverlayColors.Shade,
-        fontSize: 12,
-      });
-    });
-  }
-
-  if (scene.picking) {
-    const pickingPrompt = scene.picking.mode === BibDesignPickMode.New
-      ? 'Click the number of a clear bib of the new design'
-      : `Click the number of a clear ${scene.picking.name} bib · Esc when done`;
-    drawPill({
-      context,
-      text: pickingPrompt,
-      centerX: rect.x + rect.width / 2,
-      centerY: rect.y + 36,
-      background: OverlayColors.FinishLine,
-      foreground: '#111827',
-      fontSize: 15,
     });
   }
 

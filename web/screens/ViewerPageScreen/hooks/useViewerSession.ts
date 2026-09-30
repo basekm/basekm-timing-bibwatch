@@ -96,6 +96,11 @@ export type FramePoint = {
   y: number;
 };
 
+// Reading only the torsos of the people found lists more runners and is usually faster than
+// reading the whole frame (bench/: 30 vs 27 of 31 runners, 152 s vs 167 s), for a couple more
+// misreads. The whole frame stays one click away.
+const IsPeopleFirstByDefault = true;
+
 const LegacyClockStorageKey = (videoName: string) => `bibwatch.clock.${videoName}`;
 
 const toDetections = (json: DetectionsDto | SegmentsFileDto): DetectionsDto => {
@@ -191,7 +196,7 @@ export const useViewerSession = ({
   const [clockOffset, setClockOffset] = useState<number | null>(null);
   const [tags, setTags] = useState<TagsBySightingKey>({});
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const [isPeopleFirst, setIsPeopleFirst] = useState(false);
+  const [isPeopleFirst, setIsPeopleFirst] = useState(IsPeopleFirstByDefault);
   const [finishLinePoints, setFinishLinePoints] = useState<FramePoint[] | null>(null);
   const [pendingRead, setPendingRead] = useState<ManualReadDto | null>(null);
 
@@ -348,7 +353,6 @@ export const useViewerSession = ({
       label: sighting.label,
       zone: sighting.zone ?? null,
       direction: sighting.direction ?? null,
-      template: sighting.template ?? null,
       target: Boolean(sighting.target),
       registered: typeof sighting.registered === 'boolean' ? sighting.registered : null,
       reads: sighting.reads ?? 0,
@@ -403,6 +407,8 @@ export const useViewerSession = ({
     writeSelectedVideo(source.mediaVideo);
     setClockOffset(serverClock ?? legacyClock ?? null);
     setFinishLinePoints(null);
+    // A video's saved scan decides (loadDetections); a video never scanned gets the default.
+    setIsPeopleFirst(IsPeopleFirstByDefault);
 
     const shouldMoveLegacyClock = serverClock === undefined && legacyClock !== null && source.mediaVideo !== null;
     if (shouldMoveLegacyClock && source.mediaVideo) {
@@ -853,7 +859,7 @@ export const useViewerSession = ({
 
   const canScan = isScanning || (isServerAvailable && Boolean(mediaVideo));
 
-  const startScan = useCallback(async (templateIds: string[]) => {
+  const startScan = useCallback(async () => {
     if (isScanning) {
       cancelScanJob();
       return;
@@ -868,10 +874,8 @@ export const useViewerSession = ({
         video: mediaVideo,
         segments: segments.length ? segmentsFile(segments) : null,
         clock: clockOffset !== null ? formatClockTime(clockOffset) : null,
-        templates: templateIds,
         from: Number(controller.currentTime.toFixed(1)),
-        // Bib designs choose where to read; "Only look for people" applies without them.
-        peopleFirst: isPeopleFirst && templateIds.length === 0,
+        peopleFirst: isPeopleFirst,
       });
       lastCheckpointRef.current = null;
     } catch (error) {

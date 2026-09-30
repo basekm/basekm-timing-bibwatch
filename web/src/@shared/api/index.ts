@@ -13,4 +13,3 @@ export * from './scans';
 export * from './event';
 export * from './sightings';
 export * from './tags';
-export * from './templates';

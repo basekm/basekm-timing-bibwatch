@@ -11,4 +11,3 @@ export * from './scans/SegmentsSaveRequestDto';
 export * from './sightings/SightingSearchResultDto';
 export * from './sightings/SightingsSaveRequestDto';
 export * from './tags/TagsDto';
-export * from './templates/TemplateDto';

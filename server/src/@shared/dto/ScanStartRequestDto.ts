@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsNotEmpty, IsNumber, IsObject, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsNotEmpty, IsNumber, IsObject, IsOptional, IsString } from 'class-validator';
 
 export class ScanStartRequestDto {
   @IsNotEmpty()
@@ -15,12 +15,6 @@ export class ScanStartRequestDto {
   @IsOptional()
   @IsString()
   clock: string | null;
-
-  /** Template ids to scan with. */
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  templates: string[];
 
   /** Video time (s) to start reading from; the scan wraps round to the beginning. */
   @IsOptional()

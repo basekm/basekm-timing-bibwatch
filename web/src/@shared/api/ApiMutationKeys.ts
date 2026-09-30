@@ -40,20 +40,6 @@ class ApiMutationKeysTags {
   }
 }
 
-class ApiMutationKeysTemplates {
-  static create() {
-    return ['templates', 'create'];
-  }
-
-  static calibrate() {
-    return ['templates', 'calibrate'];
-  }
-
-  static remove() {
-    return ['templates', 'remove'];
-  }
-}
-
 export class ApiMutationKeys {
   static get Media() {
     return ApiMutationKeysMedia;
@@ -73,9 +59,5 @@ export class ApiMutationKeys {
 
   static get Tags() {
     return ApiMutationKeysTags;
-  }
-
-  static get Templates() {
-    return ApiMutationKeysTemplates;
   }
 }
