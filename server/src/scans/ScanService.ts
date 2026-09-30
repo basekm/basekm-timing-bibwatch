@@ -14,7 +14,6 @@ import { EventService } from '../event/EventService';
 import { MediaService } from '../media/MediaService';
 import { SightingImportService } from '../sightings/SightingImportService';
 import { SightingService } from '../sightings/SightingService';
-import { TemplateService } from '../templates/TemplateService';
 
 import { ScanJob } from './ScanJob';
 
@@ -27,7 +26,6 @@ export class ScanService {
     private readonly bibwatchService: BibwatchService,
     private readonly eventService: EventService,
     private readonly mediaService: MediaService,
-    private readonly templateService: TemplateService,
     private readonly sightingService: SightingService,
     private readonly sightingImportService: SightingImportService,
   ) {}
@@ -41,9 +39,6 @@ export class ScanService {
       throw new InternalServerErrorException({ error: 'scanner not built — run: swift build -c release' });
     }
     const videoPath = await this.mediaService.resolveVideo(body.video);
-    if (body.peopleFirst && body.templates?.length) {
-      throw new BadRequestException({ error: '"Only look for people" and bib designs are two ways of reading — untick one' });
-    }
 
     // Checked and set with no `await` in between, so two clicks can't start two scans.
     if (this.job?.isRunning) {
@@ -62,13 +57,6 @@ export class ScanService {
 
     const media = this.mediaService.folder;
     const optional = async (file: string) => ((await pathExists(file)) ? file : null);
-    const templatePaths = [];
-    for (const id of body.templates ?? []) {
-      const templatePath = this.templateService.pathOf(id);
-      if (templatePath && (await pathExists(templatePath))) {
-        templatePaths.push(templatePath);
-      }
-    }
 
     const registeredPath = await optional(path.join(media, 'registered.txt'));
 
@@ -80,8 +68,7 @@ export class ScanService {
       clock: body.clock ?? null,
       targetsPath: await optional(path.join(media, 'targets.txt')),
       registeredPath,
-      templatePaths,
-      bibArgs: this.eventService.bibArgsOf(await this.eventService.getBibRules(), { withRange: templatePaths.length === 0 }),
+      bibArgs: this.eventService.bibArgsOf(await this.eventService.getBibRules()),
       peopleFirst: Boolean(body.peopleFirst),
       startAt: body.from ?? null,
     });

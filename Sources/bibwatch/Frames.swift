@@ -161,8 +161,6 @@ struct BibRead: Codable {
   var bib: String
   var box: Box
   var confidence: Double
-  /// Name of the bib template (design) that found it; nil for whole-frame reading.
-  var template: String? = nil
   /// Read from only 3 digits (padded) — a partial number, e.g. "010" from a half-read "0109".
   var fragment: Bool? = nil
 }
@@ -173,23 +171,9 @@ struct FrameReads {
   var rejectedByColor: Int
 }
 
-func readFrame(_ image: CGImage, people wantPeople: Bool, colorCheck: Bool, maxBib: Int, templates: [BibTemplate] = [],
-               peopleFirst: Bool = false) -> FrameReads {
+func readFrame(_ image: CGImage, people wantPeople: Bool, colorCheck: Bool, maxBib: Int, peopleFirst: Bool = false) -> FrameReads {
   if peopleFirst {
     return readPeopleFirst(image, people: wantPeople, maxBib: maxBib)
-  }
-  // Template mode: find number areas by each bib design's colours first, read only those.
-  if !templates.isEmpty {
-    var people: [Box] = []
-    if wantPeople {
-      let humans = VNDetectHumanRectanglesRequest()
-      humans.upperBodyOnly = false
-      timed("humans") { try? VNImageRequestHandler(cgImage: image, options: [:]).perform([humans]) }
-      people = (humans.results ?? []).map { Box(visionRect: $0.boundingBox) }
-    }
-    guard let px = timed("pixels", { Pixels(image) }) else { return FrameReads(bibs: [], people: people, rejectedByColor: 0) }
-    let candidates = timed("finder") { findAllCandidates(px, templates) }
-    return FrameReads(bibs: timed("read") { readCandidates(image, candidates) }, people: people, rejectedByColor: 0)
   }
   let text = VNRecognizeTextRequest()
   text.recognitionLevel = .accurate

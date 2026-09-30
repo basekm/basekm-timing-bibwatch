@@ -50,8 +50,7 @@ import {
 } from '@basekm/components/ViewerHeader';
 import {
   EventSettingsSaveRequestDto,
-  SightingDto,
-  TemplateGetResponseDto
+  SightingDto
 } from '@basekm/dtos';
 import {
   useLocalStorageState
@@ -64,12 +63,6 @@ import {
   AddRunnerDialog,
   PersonToAdd
 } from './components/AddRunnerDialog';
-import {
-  BibDesignDetailsDialog
-} from './components/BibDesignDetailsDialog';
-import {
-  BibDesignsDialog
-} from './components/BibDesignsDialog';
 import {
   BibNumbersDialog
 } from './components/BibNumbersDialog';
@@ -99,10 +92,6 @@ import {
   OverlaySettings,
   ViewerMoreMenu
 } from './components/ViewerMoreMenu';
-import {
-  BibDesignPickMode,
-  useBibDesigns
-} from './hooks/useBibDesigns';
 import {
   useVideoTime
 } from './hooks/useVideoTime';
@@ -142,10 +131,7 @@ const DefaultOverlaySettings: OverlaySettings = {
   isEveryBibShown: true,
 };
 
-const DefaultMaxBib = 250;
 const SeekLeadSeconds = 2;
-
-const pluralize = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
 
 export const ViewerPageScreen = () => {
   const [controller] = useState(() => new VideoPlaybackController());
@@ -179,21 +165,12 @@ export const ViewerPageScreen = () => {
   const [runnerListScope, setRunnerListScope] = useState<RunnerListScope>(RunnerListScope.ThisVideo);
   const [isClockDialogOpen, setIsClockDialogOpen] = useState(false);
   const [isBibNumbersDialogOpen, setIsBibNumbersDialogOpen] = useState(false);
-  const [isBibDesignsDialogOpen, setIsBibDesignsDialogOpen] = useState(false);
   const [isClearScansDialogOpen, setIsClearScansDialogOpen] = useState(false);
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
-  const [isFinderShown, setIsFinderShown] = useState(false);
   const [clockDialogVideoTime, setClockDialogVideoTime] = useState(0);
   const [personToAdd, setPersonToAdd] = useState<PersonToAdd | null>(null);
 
   const videoFileInputRef = useRef<HTMLInputElement>(null);
-
-  const bibDesigns = useBibDesigns({
-    isServerAvailable: session.isServerAvailable,
-    mediaVideo: session.mediaVideo,
-    pausedAt: videoState.pausedAt,
-    isFinderShown,
-  });
 
   const {
     eventSettingsGetQuery
@@ -231,9 +208,6 @@ export const ViewerPageScreen = () => {
     isBibsShown: true,
     isEveryBibShown: true,
     finishLinePoints: null,
-    picking: null,
-    finder: null,
-    templates: [],
     clockOffset: null,
     swipeFlashUntil: 0,
   });
@@ -245,9 +219,6 @@ export const ViewerPageScreen = () => {
     targets: session.targets,
     ...overlaySettings,
     finishLinePoints: session.finishLinePoints,
-    picking: bibDesigns.picking,
-    finder: bibDesigns.finder,
-    templates: bibDesigns.templates,
     clockOffset: session.clockOffset,
     swipeFlashUntil: 0,
   };
@@ -278,10 +249,6 @@ export const ViewerPageScreen = () => {
       : `${eventSettings.minDigits}–${eventSettings.maxDigits}`;
     return `Who is running (${digitsText} digit bibs)`;
   }, [eventSettings]);
-
-  const bibDesignsSummary = bibDesigns.templateIdsInUse.length
-    ? `${pluralize(bibDesigns.templateIdsInUse.length, 'design')} in use`
-    : 'Currently reading the whole frame · not needed for most races';
 
   const selectSighting = useCallback((sighting: SightingDto) => {
     controller.pause();
@@ -356,16 +323,6 @@ export const ViewerPageScreen = () => {
   };
 
   const handleFrameClick = useCallback((point: FramePoint | null) => {
-    if (bibDesigns.picking) {
-      if (point) {
-        bibDesigns.pickAt({
-          point,
-          time: controller.currentTime,
-        });
-      }
-      return;
-    }
-
     if (session.finishLinePoints) {
       if (point) {
         session.addFinishLinePoint(point);
@@ -374,7 +331,7 @@ export const ViewerPageScreen = () => {
     }
 
     selectRunnerAt(point);
-  }, [bibDesigns, controller, selectRunnerAt, session]);
+  }, [selectRunnerAt, session]);
 
   const openClockDialog = useCallback(() => {
     controller.pause();
@@ -382,26 +339,23 @@ export const ViewerPageScreen = () => {
     setIsClockDialogOpen(true);
   }, [controller]);
 
-  const hasBibDesignsInUse = bibDesigns.templateIdsInUse.length > 0;
-  const isPeopleFirstInEffect = session.isPeopleFirst && !hasBibDesignsInUse;
-
   const handleScanClick = () => {
     const willChangeReader = !session.isScanning
       && session.scanMadeWithPeopleFirst !== null
-      && session.scanMadeWithPeopleFirst !== isPeopleFirstInEffect;
+      && session.scanMadeWithPeopleFirst !== session.isPeopleFirst;
 
     if (!willChangeReader) {
-      session.startScan(bibDesigns.templateIdsInUse);
+      session.startScan();
       return;
     }
 
     const madeWith = session.scanMadeWithPeopleFirst ? 'with' : 'without';
-    const scanWith = isPeopleFirstInEffect ? 'with' : 'without';
+    const scanWith = session.isPeopleFirst ? 'with' : 'without';
     setConfirmRequest({
       title: 'Scan the whole video again?',
       description: `This video’s saved scan was made ${madeWith} “Only look for people”. Scanning ${scanWith} it reads the whole video again from the start.`,
       confirmLabel: 'Scan again',
-      onConfirm: () => session.startScan(bibDesigns.templateIdsInUse),
+      onConfirm: () => session.startScan(),
     });
   };
 
@@ -444,34 +398,6 @@ export const ViewerPageScreen = () => {
     }
   };
 
-  const handleCalibrateDesign = (template: TemplateGetResponseDto) => {
-    setIsBibDesignsDialogOpen(false);
-    controller.pause();
-    bibDesigns.startPicking({
-      mode: BibDesignPickMode.Calibrate,
-      templateId: template.id,
-      name: template.name,
-    });
-  };
-
-  const handleAddDesignFromVideo = () => {
-    setIsBibDesignsDialogOpen(false);
-    controller.pause();
-    bibDesigns.startPicking({
-      mode: BibDesignPickMode.New,
-    });
-  };
-
-  const handleRemoveDesign = (template: TemplateGetResponseDto) => {
-    setConfirmRequest({
-      title: `Remove the bib design “${template.name}”?`,
-      description: 'Scans already made keep their results.',
-      confirmLabel: 'Remove',
-      isDestructive: true,
-      onConfirm: () => bibDesigns.removeTemplate(template.id),
-    });
-  };
-
   const handleFileInputChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -482,9 +408,8 @@ export const ViewerPageScreen = () => {
   };
 
   const handleEscape = useCallback(() => {
-    bibDesigns.stopPicking();
     session.cancelFinishLineMarking();
-  }, [bibDesigns, session]);
+  }, [session]);
 
   useViewerShortcuts({
     controller,
@@ -581,23 +506,20 @@ export const ViewerPageScreen = () => {
     };
   }, [openFile]);
 
-  const isPicking = Boolean(bibDesigns.picking) || Boolean(session.finishLinePoints);
+  const isPicking = Boolean(session.finishLinePoints);
   const hasVideo = session.videoSource !== null;
 
   const moreMenu = (
     <ViewerMoreMenu
       isEventAvailable={session.isServerAvailable && eventSettings !== null}
       bibNumbersSummary={bibNumbersSummary}
-      bibDesignsSummary={bibDesignsSummary}
       hasVideo={hasVideo}
       canClearScans={session.isServerAvailable && Boolean(session.mediaVideo) && !session.isScanning}
       isPeopleFirst={session.isPeopleFirst}
-      hasBibDesignsInUse={hasBibDesignsInUse}
       overlaySettings={overlaySettings}
       swipeSpeed={Number(swipeSpeed)}
       onOpenVideoFile={() => videoFileInputRef.current?.click()}
       onOpenBibNumbers={() => setIsBibNumbersDialogOpen(true)}
-      onOpenBibDesigns={() => setIsBibDesignsDialogOpen(true)}
       onSetRaceClock={openClockDialog}
       onExportCsv={handleExportCsv}
       onDownloadSegments={session.exportSegments}
@@ -736,29 +658,6 @@ export const ViewerPageScreen = () => {
         onOpenChange={setIsBibNumbersDialogOpen}
         onSave={handleSaveBibNumbers}
       />
-
-      <BibDesignsDialog
-        isOpen={isBibDesignsDialogOpen}
-        templates={bibDesigns.templates}
-        templateIdsInUse={bibDesigns.templateIdsInUse}
-        isPeopleFirst={session.isPeopleFirst}
-        isFinderShown={isFinderShown}
-        onOpenChange={setIsBibDesignsDialogOpen}
-        onTemplateInUseChange={bibDesigns.setTemplateInUse}
-        onCalibrate={handleCalibrateDesign}
-        onRemove={handleRemoveDesign}
-        onAddFromImage={bibDesigns.addFromImage}
-        onAddFromVideo={handleAddDesignFromVideo}
-        onFinderShownChange={setIsFinderShown}
-      />
-
-      <BibDesignDetailsDialog
-        isOpen={bibDesigns.pendingDesign !== null}
-        defaultMaxBib={session.detections?.maxBib || DefaultMaxBib}
-        onCancel={bibDesigns.cancelPendingDesign}
-        onSave={bibDesigns.createPendingDesign}
-      />
-
       <ClearScansDialog
         isOpen={isClearScansDialogOpen}
         videoName={session.mediaVideo ?? ''}

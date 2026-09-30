@@ -30,10 +30,6 @@ export class SightingDto {
   direction: string | null;
 
   @IsOptional()
-  @IsString()
-  template: string | null;
-
-  @IsOptional()
   @IsBoolean()
   target: boolean;
 

@@ -13,8 +13,7 @@ export type ScanJobOptions = {
   clock: string | null;
   targetsPath: string | null;
   registeredPath: string | null;
-  templatePaths: string[];
-  /** The event's bib rules as scanner options (digits always; number range without templates). */
+  /** The event's bib rules as scanner options (digits and number range). */
   bibArgs: string[];
   /** Read bibs only on people's torsos (experimental). */
   peopleFirst: boolean;
@@ -107,14 +106,9 @@ export class ScanJob {
       if (options.registeredPath) {
         args.push('--registered', options.registeredPath);
       }
-      for (const templatePath of options.templatePaths) {
-        args.push('--template', templatePath);
-      }
-      if (!options.templatePaths.length) {
-        // Reading the whole frame: accept any bib design. The scanner's colour check only knows
-        // one design (white digits on magenta) and rejects every other race's bibs.
-        args.push('--no-color');
-      }
+      // Accept any bib design: the scanner's colour check only knows one (white digits on
+      // magenta) and rejects every other race's bibs.
+      args.push('--no-color');
       args.push(...options.bibArgs);
       if (options.peopleFirst) {
         args.push('--people-first');

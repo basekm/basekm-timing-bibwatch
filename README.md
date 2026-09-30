@@ -42,14 +42,18 @@ Or put `MEDIA_FOLDER` (and `PORT`) in `server/.env.development` / `.env.producti
 Reads accumulate per video in `media/scans/<video>/detections.json` (with the segments you
 sent in `segments.json`). Cancelling a scan discards that run's new reads.
 
-### People only (experimental)
+### People only (on by default)
 
-Tick **⋯ More › Only look for people (faster)** to find people first and read bibs only on their
-torsos: each torso is cut out, scaled to the same height (small, distant bibs get enlarged) and
-read in one picture, so banners, cones and signs are never read. On two hand-checked Chubb
-stretches it found 29 of 29 bibs (whole-frame reading: 27) in 11 % less time, but with a few
-more one-digit slips (e.g. 5164 for 5161). Changing the box scans the video again from the
-start. Command line: `scan … --people-first`; add `--profile` to see where the time goes.
+**⋯ More › Only look for people** finds people first and reads bibs only on their torsos:
+each torso is cut out, scaled to the same height (small, distant bibs get enlarged) and read
+in one picture, so banners, cones and signs are never read. It's on for videos not scanned
+yet; a video keeps the way its saved scan was made. Untick it to read the whole frame.
+Changing the box scans the video again from the start.
+
+Measured (`bench/run.sh`, 31 hand-checked runners on two Chubb clips): people only lists 30,
+whole frame 27; wrong numbers listed 6 vs 4; 152 s vs 167 s. On a later stretch of the same
+race with other runners: 9 runners each, 73 s vs 112 s. Command line: `scan … --people-first`; add `--profile` to see
+where the time goes.
 
 ## Search all videos
 
@@ -77,7 +81,7 @@ The viewer is a Next.js app in `web/` (shadcn/ui + Tailwind, laid out and themed
 - **Mark and annotate**: previous / next runner, **Mark finish line**, **Split camera position here**.
 - **Runners spotted** (right): All / Finished / Watchlist / Not yet finished, search, movement,
   **CSV**, and **This video / All videos**. Select a runner to tag it.
-- **⋯ More**: open files, bib numbers and bib designs, race clock, split, download segments.json,
+- **⋯ More**: open files, bib numbers, race clock, split, download segments.json,
   people-only scanning, what to draw on the video, trackpad settings, keyboard shortcuts, and
   clear scans.
 
@@ -111,27 +115,6 @@ the highest registered number is used. With mixed lengths it matters most: only 
 5-digit bib from a 6-digit one with a digit hidden. Changing the rules makes the next scan of
 each video read it again from the start. Command line: `scan … --digits 4-6 [--min-bib N]`.
 
-## Bib templates (less noise, faster)
-
-A template is one bib design, **measured — not trained**: band colour, digit colour, digit
-size and the bib-number range. With templates ticked, a scan first finds white digits sitting
-on that band colour (a few ms per frame) and only reads those areas, enlarged — so shirt
-logos, the "2026" in the bib logo, signage and other text are never read at all.
-
-In the viewer's **⋯ More › Bib designs…**:
-- **+ From design image** — the bib artwork (PNG/JPEG); give it a name and number range.
-- **+ From a bib in the video** — click the number of one clear bib (when you have no artwork).
-- **Calibrate** — click 3–5 clear bibs of that design in the footage (sunlit and shaded);
-  it adjusts the colours and sizes to how they look on camera. Esc when done.
-- Tick every design used at the event (e.g. 5K pink and 1K teal) — several work together;
-  each read is labelled with the design that found it.
-- **Show what the designs find** — dashed boxes on the paused frame, to check nothing
-  but bib numbers is picked up.
-
-Command line: `bibwatch template design.png t.json --name "5K" --max-bib 250`,
-`bibwatch template --from-video V --at t,x,y t.json`, `bibwatch calibrate t.json V --at t,x,y …`,
-`bibwatch finder V --template t.json [--template …] --at t`, and `scan … --template t.json …`.
-
 ## Tags
 
 Every bib seen gets a **numbered tag** — the mat is optional:
@@ -146,7 +129,7 @@ Every bib seen gets a **numbered tag** — the mat is optional:
 | 005 | Duplicate | the same runner read as another number (a misread) — the note says which |
 
 Plus detail on each sighting: **zone** (background / before-mat / on-mat / past-mat),
-**direction** (toward / away / still) and the **design** (template) it was read with.
+and **direction** (toward / away / still).
 
 Your own tags start at **100**: select a runner (in the list, on the timeline, or click its bib on the video)
 and press **1–4** — 100 finisher, 101 photo, 102 misread, 103 wrong bib — or type any tag;
@@ -249,7 +232,7 @@ Load the video and `detections.json` in the viewer:
 
 ### 6. Measure accuracy (answer keys)
 
-To compare reading methods (whole frame, people only, templates), score them against a
+To compare reading methods (whole frame, people only), score them against a
 hand-checked list of the bibs in a stretch of video:
 
 ```bash
@@ -299,7 +282,7 @@ http://localhost:3000 with hot reload. The app follows
 `basekm-timing-engine-web` (structure, shadcn/ui primitives, theme); see `web/.agents/skills/`.
 
 The server (`server/`) is a NestJS app laid out like `basekm-timing-backend`: one module per
-area (`media`, `scans`, `templates`, `bibwatch` runs the Swift binary), DTOs and constants in
+area (`media`, `scans`, `bibwatch` runs the Swift binary), DTOs and constants in
 `src/@shared`. It serves the media folder at `/media/` (with HTTP Range, so
 video seeking works) and the API at `/api/`.
 

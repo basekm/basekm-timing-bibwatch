@@ -41,7 +41,7 @@ func formatTime(_ t: Double, tenths: Bool = false) -> String {
 struct Args {
   var positional: [String] = []
   var options: [String: String] = [:]
-  /// Every value of options that may be repeated (e.g. several --template).
+  /// Every value of options that may be repeated.
   var all: [String: [String]] = [:]
   var switches: Set<String> = []
 

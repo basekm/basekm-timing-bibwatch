@@ -27,8 +27,6 @@ struct Sighting: Codable {
   var zone: String? = nil
   /// toward (the camera) | away | still (nil when not tracked).
   var direction: String? = nil
-  /// Bib design (template) the number was read with, when templates are used.
-  var template: String? = nil
   /// false when the bib isn't in the race's participant list (--registered); nil when no list given.
   var registered: Bool? = nil
   /// Reads of the full number (not 3-digit fragments) — decides which bib owns a crossing.
@@ -42,7 +40,8 @@ struct ScanSettings: Codable, Equatable {
   var pad: Double
   var maxBib: Int
   var colorCheck: Bool
-  /// Bib template in use (name + its measured values), nil = whole-frame reading.
+  /// Bib templates of scans made before templates were removed: kept so such a scan never
+  /// counts as the same settings (its frame reads aren't reused). Always nil now.
   var template: String? = nil
   /// "people-first": text is read only on the torsos of people found in the frame.
   var reader: String? = nil
@@ -114,8 +113,6 @@ func evaluate(_ w: Window, frames allFrames: [OverlayFrame], pad: Double, fineFp
 
   let lo = max(w.seg.from, w.from - pad), hi = min(w.seg.to, w.to + pad)
   let frames = allFrames.filter { $0.people != nil && $0.t >= lo - 1e-6 && $0.t <= hi + 1e-6 }
-  let designs = frames.flatMap { $0.bibs.filter { $0.bib == w.bib }.compactMap(\.template) }
-  s.template = Dictionary(grouping: designs, by: { $0 }).max { $0.value.count < $1.value.count }?.key
   let expected = max(1, Int(((hi - lo) * fineFps).rounded(.down)))
   if Double(frames.count) < 0.8 * Double(expected) {
     s.label = "needs-scan"; s.note = "not enough frames read here yet — run the scan"; return s
@@ -210,7 +207,7 @@ func runScan(_ raw: [String]) {
     die("""
       usage: bibwatch scan <video> <outDir> [--targets targets.txt] [--segments segments.json | --mat X0,Y0,X1,Y1]
                            [--clock HH:MM:SS] [--every 0.5] [--fine-fps 10] [--pad 4] [--start mm:ss] [--end mm:ss]
-                           [--max-bib 250] [--min-bib 1] [--digits 4-6] [--no-color] [--template template.json …] [--registered bibs.txt]
+                           [--max-bib 250] [--min-bib 1] [--digits 4-6] [--no-color] [--registered bibs.txt]
                            [--from mm:ss] [--fresh] [--people-first] [--profile] [--progress json]
 
       Frame reads are kept in <outDir>/detections.json and reused by later scans of the same
@@ -220,17 +217,9 @@ func runScan(_ raw: [String]) {
   }
   let videoPath = args.positional[0], outDir = args.positional[1]
   progressJSON = args.options["progress"] == "json"
-  let templates: [BibTemplate] = (args.all["template"] ?? []).map { readJSON(BibTemplate.self, $0) }
-  if !templates.isEmpty && args.switches.contains("people-first") {
-    die("--people-first and --template are two different ways of reading: people-first reads the torsos of the people found, templates look for the bib colours across the frame. Pick one.")
-  }
-  let templateID = templates.isEmpty ? nil : templates.map { t in
-    String(format: "%@ h%.1f±%.0f s%.2f v%.2f w%.2f/%.2f d%.4f-%.4f r%d-%d", t.name, t.bandHue, t.hueTolerance, t.bandSatMin, t.bandValMin,
-           t.digitSatMax, t.digitValMin, t.digitHeightMin, t.digitHeightMax, t.minBib ?? 1, t.maxBib)
-  }.joined(separator: " | ")
   let settings = ScanSettings(every: args.double("every", 0.5), fineFps: args.double("fine-fps", 10), pad: args.double("pad", 4),
-                              maxBib: templates.map(\.maxBib).max() ?? Int(args.double("max-bib", 250)), colorCheck: !args.switches.contains("no-color"),
-                              template: templateID, reader: args.switches.contains("people-first") ? "people-first" : nil,
+                              maxBib: Int(args.double("max-bib", 250)), colorCheck: !args.switches.contains("no-color"),
+                              reader: args.switches.contains("people-first") ? "people-first" : nil,
                               digits: BibText.isClassic ? nil : "\(BibText.minDigits)-\(BibText.maxDigits)",
                               minBib: BibText.minBib > 1 ? BibText.minBib : nil)
   let clockSeconds = args.options["clock"].map(parseTime)
@@ -358,7 +347,7 @@ func runScan(_ raw: [String]) {
         if overlay[kk]?.people == nil {
           autoreleasepool {
             if let img = video.frame(at: Double(kk) / 1000) {
-              let r = readFrame(img, people: true, colorCheck: settings.colorCheck, maxBib: settings.maxBib, templates: templates,
+              let r = readFrame(img, people: true, colorCheck: settings.colorCheck, maxBib: settings.maxBib,
                                 peopleFirst: settings.reader == "people-first")
               rejected += r.rejectedByColor
               overlay[kk] = OverlayFrame(t: Double(kk) / 1000, bibs: r.bibs, people: r.people)
@@ -379,7 +368,7 @@ func runScan(_ raw: [String]) {
       if scanStopRequested { break }
       autoreleasepool {
         guard let img = video.frame(at: t) else { return }
-        let r = readFrame(img, people: false, colorCheck: settings.colorCheck, maxBib: settings.maxBib, templates: templates,
+        let r = readFrame(img, people: false, colorCheck: settings.colorCheck, maxBib: settings.maxBib,
                           peopleFirst: settings.reader == "people-first")
         rejected += r.rejectedByColor
         if !r.bibs.isEmpty, overlay[key(t)] == nil { overlay[key(t)] = OverlayFrame(t: t, bibs: r.bibs, people: nil) }

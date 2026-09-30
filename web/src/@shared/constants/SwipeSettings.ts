@@ -2,7 +2,6 @@ export const SwipeSpeedDefault = 35;
 
 export const SwipeSpeedStorageKey = 'bibwatch.swipeSpeed';
 
-export const TemplatesInUseStorageKey = 'bibwatch.templates';
 
 export const SelectedVideoStorageKey = 'bibwatch.selectedVideo';
 

@@ -9,17 +9,13 @@ import { EventService } from './EventService';
 const eventService = new EventService({} as any, { MediaFolder: '/videos/race' } as ConfigService);
 
 describe('EventService.bibArgsOf', () => {
-  it('adds nothing for the classic 4 digits, so earlier scans stay reusable', () => {
-    expect(eventService.bibArgsOf({ minDigits: 4, maxDigits: 4, minBib: 1, maxBib: 9999 }, { withRange: false })).toEqual([]);
-    expect(eventService.bibArgsOf({ minDigits: 4, maxDigits: 4, minBib: 1, maxBib: 9999 }, { withRange: true })).toEqual(['--max-bib', '9999']);
+  it('adds no --digits for the classic 4 digits, so earlier scans stay reusable', () => {
+    expect(eventService.bibArgsOf({ minDigits: 4, maxDigits: 4, minBib: 1, maxBib: 9999 })).toEqual(['--max-bib', '9999']);
   });
 
   it('passes mixed lengths and the number range', () => {
-    expect(eventService.bibArgsOf({ minDigits: 4, maxDigits: 6, minBib: 1000, maxBib: 999999 }, { withRange: true }))
+    expect(eventService.bibArgsOf({ minDigits: 4, maxDigits: 6, minBib: 1000, maxBib: 999999 }))
       .toEqual(['--digits', '4-6', '--max-bib', '999999', '--min-bib', '1000']);
-    // Templates bring their own number range; only the digits apply.
-    expect(eventService.bibArgsOf({ minDigits: 4, maxDigits: 6, minBib: 1000, maxBib: 999999 }, { withRange: false }))
-      .toEqual(['--digits', '4-6']);
   });
 });
 

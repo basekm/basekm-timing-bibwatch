@@ -83,7 +83,7 @@ export const RunnerTagEditor = ({
   const [customTag, setCustomTag] = useState('');
   const customTags = myTags.filter((tag) => !PresetTags.includes(tag));
   const zoneLabel = sighting.zone ? RunnerZoneLabels[sighting.zone] ?? sighting.zone : null;
-  const details = [zoneLabel, sighting.template, sighting.note].filter(Boolean).join(' · ');
+  const details = [zoneLabel, sighting.note].filter(Boolean).join(' · ');
 
   const handleCustomTagKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key !== 'Enter') {

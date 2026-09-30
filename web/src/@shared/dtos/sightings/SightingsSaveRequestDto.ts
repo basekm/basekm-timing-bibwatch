@@ -10,7 +10,6 @@ export class SightingSaveItemDto extends AppBaseDto {
   label: string;
   zone: string | null;
   direction: string | null;
-  template: string | null;
   target: boolean;
   registered: boolean | null;
   reads: number;

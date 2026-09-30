@@ -60,14 +60,12 @@ export class EventService {
     };
   }
 
-  /** Scanner options for these rules (the classic 4 digits adds nothing, so earlier scans stay reusable). */
-  bibArgsOf(rules: BibRules, options: { withRange: boolean }) {
+  /** Scanner options for these rules (the classic 4 digits adds no --digits, so earlier scans stay reusable). */
+  bibArgsOf(rules: BibRules) {
     const args = rules.minDigits === 4 && rules.maxDigits === 4 ? [] : ['--digits', `${rules.minDigits}-${rules.maxDigits}`];
-    if (options.withRange) {
-      args.push('--max-bib', String(rules.maxBib));
-      if (rules.minBib > 1) {
-        args.push('--min-bib', String(rules.minBib));
-      }
+    args.push('--max-bib', String(rules.maxBib));
+    if (rules.minBib > 1) {
+      args.push('--min-bib', String(rules.minBib));
     }
     return args;
   }

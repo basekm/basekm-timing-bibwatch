@@ -99,26 +99,6 @@ const buildReadWindows = ({
   return windows.sort((a, b) => a.from - b.from);
 };
 
-const mostUsedDesign = ({
-  frames,
-  bib,
-}: {
-  frames: DetectionFrameDto[];
-  bib: string;
-}) => {
-  const designCounts: Record<string, number> = {};
-
-  frames.forEach((frame) => {
-    frame.bibs.forEach((read) => {
-      if (read.bib === bib && read.template) {
-        designCounts[read.template] = (designCounts[read.template] || 0) + 1;
-      }
-    });
-  });
-
-  return Object.keys(designCounts).sort((a, b) => designCounts[b] - designCounts[a])[0] ?? null;
-};
-
 const trackPerson = ({
   frames,
   sighting,
@@ -283,10 +263,6 @@ const evaluateWindow = ({
     frames,
     from,
     to,
-  });
-  sighting.template = mostUsedDesign({
-    frames: nearbyFrames,
-    bib: window.bib,
   });
 
   const expectedFrames = Math.max(1, Math.floor((to - from) * settings.fineFps));

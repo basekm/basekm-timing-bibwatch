@@ -10,6 +10,6 @@ Skills available in this app, under `.agents/skills/` (symlinked into `.claude/s
 ## Where the viewer lives
 
 - `app/page.tsx` renders `screens/ViewerPageScreen` (one page, built as static files).
-- `screens/ViewerPageScreen/` owns the page: `hooks/useViewerSession.ts` (video, scan results, finish lines, tags, autosave), `hooks/useBibDesigns.ts` (bib templates), `utils/VideoPlaybackController.ts` (scrubbing and trackpad swipes), `utils/drawVideoOverlay.ts` (boxes on the video).
+- `screens/ViewerPageScreen/` owns the page: `hooks/useViewerSession.ts` (video, scan results, finish lines, tags, autosave), `utils/VideoPlaybackController.ts` (scrubbing and trackpad swipes), `utils/drawVideoOverlay.ts` (boxes on the video).
 - `src/@shared/api/*` talks to the bibwatch server (`server/`, NestJS) under `/api`; `src/@shared/utils/decideSightings.ts` mirrors the sighting decisions in `Sources/bibwatch/Scan.swift` (keep them identical: `bench/run.sh` checks).
 - `components/ViewerHeader/` follows `DashboardHeader` in `basekm-timing-engine-web`.
