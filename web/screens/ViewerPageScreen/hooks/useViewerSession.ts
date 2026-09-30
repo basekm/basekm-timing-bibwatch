@@ -519,7 +519,19 @@ export const useViewerSession = ({
   }, [loadDetections, loadVideo]);
 
   const restoreSelectedVideo = useCallback(async () => {
-    const hasQueryVideo = new URLSearchParams(window.location.search).has('video');
+    const query = new URLSearchParams(window.location.search);
+    // Opened from "All cameras": that camera, with its scan, instead of the last video.
+    const cameraVideo = query.get('camera');
+    if (cameraVideo) {
+      // Once only: a reload or another video afterwards shouldn't bring it back.
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+    if (cameraVideo && !videoSource && mediaOverview?.videos.includes(cameraVideo)) {
+      await openLibraryVideo(cameraVideo);
+      return;
+    }
+
+    const hasQueryVideo = query.has('video');
     const storedVideo = readSelectedVideo();
     if (hasQueryVideo || videoSource || !storedVideo || !mediaOverview?.videos.includes(storedVideo)) {
       return;

@@ -18,7 +18,7 @@ export class VideoService {
 
   /** The video's row, created on first use. */
   async findOrCreate(name: string) {
-    await this.videoRepository.createQueryBuilder().insert().values({ name }).orIgnore().execute();
+    await this.videoRepository.createQueryBuilder().insert().values({ name }).orIgnore().updateEntity(false).execute();
 
     return this.videoRepository.findOneByOrFail({ name });
   }

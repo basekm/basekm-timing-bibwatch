@@ -70,7 +70,7 @@ The viewer is a Next.js app in `web/` (shadcn/ui + Tailwind, laid out and themed
 `basekm-timing-engine-web`), run as its own process next to the server.
 
 - **Header**: the video list, how many runners were spotted, *Saved automatically*, the scan
-  status and **Run scan / Scan again / Stop scan**, and **⋯ More**.
+  status and **Run scan / Scan again / Stop scan**, **All cameras**, and **⋯ More**.
 - **Video**: boxes and bib numbers drawn on top, the race clock (top left), play, ±1 s, speed.
 - **Timeline** (under the video): every runner as a marker, camera positions underneath;
   Ctrl + scroll (or the slider) zooms, **Fit all** zooms out.
@@ -80,6 +80,22 @@ The viewer is a Next.js app in `web/` (shadcn/ui + Tailwind, laid out and themed
 - **⋯ More**: open files, bib numbers and bib designs, race clock, split, download segments.json,
   people-only scanning, what to draw on the video, trackpad settings, keyboard shortcuts, and
   clear scans.
+
+## All cameras (review footage together)
+
+**All cameras** (header) shows several videos side by side on one race clock: play, scrub, step
+or change speed once and every camera follows. Each camera is lined up by its race clock (the same
+one as **Set…** in the viewer), saved per video:
+
+- **Set race clock…** on one camera, at a moment you know the race time of (a chip read).
+- On the others, move the video to the moment the linked cameras show and press **Match**.
+  **Line up** redoes it for a camera that's already linked.
+- The lanes under the videos show what part of the race each camera recorded; a camera that
+  wasn't recording at that moment shows when it starts or ended.
+- Click a video to open it in the viewer at that moment (scans, runners and tags as usual);
+  **All cameras** brings you back to the same moment.
+
+Keys: Space play / pause, ← → 5 s, `,` `.` 0.1 s. Pick the videos in the cameras menu (top right).
 
 ## Bib numbers (per event)
 

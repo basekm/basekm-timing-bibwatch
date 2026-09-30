@@ -8,9 +8,11 @@ import {
   AlertCircleIcon,
   CheckIcon,
   ChevronDownIcon,
+  LayoutGridIcon,
   Loader2Icon
 } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
 
 import {
   Button
@@ -203,6 +205,18 @@ export const ViewerHeader = ({
             {scanButtonLabel}
           </Button>
         )}
+
+        <Button
+          variant="outline"
+          size="sm"
+          className="font-bold"
+          title="Every camera on one race clock"
+          render={<Link href="/cameras" />}
+          nativeButton={false}
+        >
+          <LayoutGridIcon data-icon="inline-start" />
+          <span className="hidden sm:inline">All cameras</span>
+        </Button>
 
         {actions}
       </div>

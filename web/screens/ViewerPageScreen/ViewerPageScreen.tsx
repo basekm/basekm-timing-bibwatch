@@ -496,6 +496,46 @@ export const ViewerPageScreen = () => {
     },
   });
 
+  // "All cameras" opens a camera here at the moment it was showing (?camera=…&t=…).
+  const pendingSeekRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+    const seekTime = Number(query.get('t'));
+    if (!query.has('camera') || !Number.isFinite(seekTime)) {
+      return;
+    }
+
+    pendingSeekRef.current = seekTime;
+  }, []);
+
+  useEffect(() => {
+    if (!videoElement || pendingSeekRef.current === null) {
+      return;
+    }
+
+    const seekToPending = () => {
+      if (pendingSeekRef.current === null) {
+        return;
+      }
+      controller.seekTo(pendingSeekRef.current);
+      pendingSeekRef.current = null;
+    };
+
+    if (videoElement.readyState >= 1) {
+      seekToPending();
+      return;
+    }
+
+    videoElement.addEventListener('loadedmetadata', seekToPending, {
+      once: true,
+    });
+
+    return () => {
+      videoElement.removeEventListener('loadedmetadata', seekToPending);
+    };
+  }, [controller, videoElement]);
+
   const {
     openFile,
     openFromQuery,
