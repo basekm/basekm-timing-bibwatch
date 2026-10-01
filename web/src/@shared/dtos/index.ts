@@ -8,6 +8,7 @@ export * from './folders/FoldersGetResponseDto';
 export * from './media/MediaOverviewGetResponseDto';
 export * from './media/VideoClockSaveRequestDto';
 export * from './scans/ScanClearRequestDto';
+export * from './scans/ScanQueueRequestDto';
 export * from './scans/ScanStartRequestDto';
 export * from './scans/ScanStatusGetResponseDto';
 export * from './scans/SegmentsSaveRequestDto';

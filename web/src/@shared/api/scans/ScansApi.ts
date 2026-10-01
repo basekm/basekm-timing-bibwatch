@@ -1,6 +1,7 @@
 import {
   ScanClearRequestDto,
   ScanClearResponseDto,
+  ScanQueueRequestDto,
   ScanStartRequestDto,
   ScanStatusGetResponseDto,
   SegmentsSaveRequestDto
@@ -29,6 +30,14 @@ export class ScansApi extends BaseApi {
   static async start(data: PayloadOnly<ScanStartRequestDto>) {
     const response = await super.post({
       url: `${this.baseUrl}/scan`,
+      body: data,
+    });
+    return response.json() as Promise<ScanStatusGetResponseDto>;
+  }
+
+  static async enqueue(data: PayloadOnly<ScanQueueRequestDto>) {
+    const response = await super.post({
+      url: `${this.baseUrl}/scan/queue`,
       body: data,
     });
     return response.json() as Promise<ScanStatusGetResponseDto>;

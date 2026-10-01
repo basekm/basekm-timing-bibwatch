@@ -519,9 +519,14 @@ export const CamerasPageScreen = () => {
                         isShown: isChecked,
                       })}
                     >
-                      <span className="truncate">{name}</span>
+                      <span
+                        className="min-w-0 truncate"
+                        title={name}
+                      >
+                        {name}
+                      </span>
                       {clocks[name] === undefined && (
-                        <span className="ml-auto text-xs text-muted-foreground">no race clock</span>
+                        <span className="ml-auto shrink-0 text-xs whitespace-nowrap text-muted-foreground">no race clock</span>
                       )}
                     </DropdownMenuCheckboxItem>
                   ))}

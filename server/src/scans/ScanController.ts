@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
 
 import { ScanClearRequestDto } from '../@shared/dto/ScanClearRequestDto';
+import { ScanQueueRequestDto } from '../@shared/dto/ScanQueueRequestDto';
 import { ScanStartRequestDto } from '../@shared/dto/ScanStartRequestDto';
 import { SegmentsSaveRequestDto } from '../@shared/dto/SegmentsSaveRequestDto';
 
@@ -19,6 +20,12 @@ export class ScanController {
   @HttpCode(202)
   async start(@Body() body: ScanStartRequestDto) {
     return this.scanService.start(body);
+  }
+
+  @Post('scan/queue')
+  @HttpCode(202)
+  async enqueue(@Body() body: ScanQueueRequestDto) {
+    return this.scanService.enqueue(body);
   }
 
   @Post('scan/cancel')

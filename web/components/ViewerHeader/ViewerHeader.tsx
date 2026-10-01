@@ -10,6 +10,7 @@ import {
   ChevronDownIcon,
   FolderOpenIcon,
   LayoutGridIcon,
+  ListChecksIcon,
   Loader2Icon
 } from 'lucide-react';
 import Link from 'next/link';
@@ -18,9 +19,14 @@ import {
   Button
 } from '@/components/ui/button';
 import {
+  ButtonGroup,
+  ButtonGroupSeparator
+} from '@/components/ui/button-group';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -57,6 +63,7 @@ export type ViewerHeaderProps = {
   onOpenFolderClick: () => void;
   onSelectVideo: (name: string) => void;
   onScanClick: () => void;
+  onScanSeveralClick: () => void;
   actions: ReactNode;
 };
 
@@ -116,6 +123,7 @@ export const ViewerHeader = ({
   onOpenFolderClick,
   onSelectVideo,
   onScanClick,
+  onScanSeveralClick,
   actions,
 }: ViewerHeaderProps) => {
   const videoPickerLabel = selectedVideoName ?? 'Choose a video…';
@@ -148,16 +156,42 @@ export const ViewerHeader = ({
           )}
 
           {isScanButtonShown && (
-            <Button
-              size="sm"
-              variant={isScanning ? 'outline' : 'default'}
-              disabled={isScanButtonDisabled}
-              className="px-3.5 font-bold"
-              onClick={onScanClick}
-            >
-              {isScanning && <Loader2Icon className="animate-spin" data-icon="inline-start" />}
-              {scanButtonLabel}
-            </Button>
+            <ButtonGroup>
+              <Button
+                size="sm"
+                variant={isScanning ? 'outline' : 'default'}
+                disabled={isScanButtonDisabled}
+                className="px-3.5 font-bold"
+                onClick={onScanClick}
+              >
+                {isScanning && <Loader2Icon className="animate-spin" data-icon="inline-start" />}
+                {scanButtonLabel}
+              </Button>
+              {!isScanning && <ButtonGroupSeparator />}
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  disabled={!hasVideoList}
+                  render={(
+                    <Button
+                      size="icon-sm"
+                      variant={isScanning ? 'outline' : 'default'}
+                      aria-label="More ways to scan"
+                    />
+                  )}
+                >
+                  <ChevronDownIcon />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  className="w-56"
+                >
+                  <DropdownMenuItem onClick={onScanSeveralClick}>
+                    <ListChecksIcon />
+                    {isScanning ? 'Add videos to the queue…' : 'Scan several videos…'}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </ButtonGroup>
           )}
 
           <Button
