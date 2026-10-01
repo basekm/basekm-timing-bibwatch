@@ -136,6 +136,8 @@ const DefaultOverlaySettings: OverlaySettings = {
 
 const SeekLeadSeconds = 2;
 
+const AppTitle = 'bibwatch';
+
 export const ViewerPageScreen = () => {
   const [controller] = useState(() => new VideoPlaybackController());
   const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
@@ -511,6 +513,12 @@ export const ViewerPageScreen = () => {
 
   const isPicking = Boolean(session.finishLinePoints);
   const hasVideo = session.videoSource !== null;
+  const videoName = session.videoSource?.name ?? null;
+
+  // The tab names the open video, so several open tabs are told apart.
+  useEffect(() => {
+    document.title = videoName ? `${videoName} | ${AppTitle}` : AppTitle;
+  }, [videoName]);
 
   const moreMenu = (
     <ViewerMoreMenu
