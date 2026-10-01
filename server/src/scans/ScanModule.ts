@@ -4,12 +4,13 @@ import { BibwatchModule } from '../bibwatch/BibwatchModule';
 import { EventModule } from '../event/EventModule';
 import { MediaModule } from '../media/MediaModule';
 import { SightingModule } from '../sightings/SightingModule';
+import { VideoModule } from '../videos/VideoModule';
 
 import { ScanController } from './ScanController';
 import { ScanService } from './ScanService';
 
 @Module({
-  imports: [BibwatchModule, EventModule, MediaModule, SightingModule],
+  imports: [BibwatchModule, EventModule, MediaModule, SightingModule, VideoModule],
   controllers: [ScanController],
   providers: [ScanService],
 })

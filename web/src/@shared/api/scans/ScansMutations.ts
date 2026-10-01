@@ -6,6 +6,7 @@ import {
 import {
   ScanClearRequestDto,
   ScanClearResponseDto,
+  ScanQueueRequestDto,
   ScanStartRequestDto,
   ScanStatusGetResponseDto,
   SegmentsSaveRequestDto
@@ -57,6 +58,24 @@ export const ScansMutations = {
 
     return {
       scanStartMutation,
+    };
+  },
+
+  useEnqueue: (
+    options?: Omit<UseMutationOptions<ScanStatusGetResponseDto, Error, PayloadOnly<ScanQueueRequestDto>>, 'mutationKey' | 'mutationFn'>,
+  ) => {
+    const scanEnqueueMutation = useMutation<ScanStatusGetResponseDto, Error, PayloadOnly<ScanQueueRequestDto>>({
+      mutationKey: ApiMutationKeys.Scans.enqueue(),
+      mutationFn: (payload) => ScansApi.enqueue(payload),
+      ...options,
+      onSuccess: (data, variables, onMutateResult, context) => {
+        refreshScanStatus();
+        options?.onSuccess?.(data, variables, onMutateResult, context);
+      },
+    });
+
+    return {
+      scanEnqueueMutation,
     };
   },
 

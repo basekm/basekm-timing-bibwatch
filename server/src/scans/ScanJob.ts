@@ -140,7 +140,7 @@ export class ScanJob {
     }
   }
 
-  private fail(message: string) {
+  fail(message: string) {
     this.state = ScanStateId.Failed;
     this.message = message;
   }

@@ -47,6 +47,12 @@ Working on the code: `npm run dev` in `server/` and `web/` rebuild and restart o
 5. If a change needs frames that were never read, those runners show *Not read here yet* —
    **Scan again** only reads the missing frames and adds them to what's there.
 
+**Several videos:** the arrow next to **Run scan › Scan several videos…** picks videos to scan one
+after another (one scan already uses the whole Mac, so running them side by side wouldn't finish
+sooner). Each is scanned from its start with its own camera positions, race clock and people-only
+setting; **Stop scan** stops the running one and drops the rest. API: `POST /api/scan/queue` with
+`{"videos": [...]}`; `GET /api/scan` lists what's waiting (`queue`) and how each one ended (`finished`).
+
 Reads accumulate per video in `<folder>/scans/<video>/detections.json` (with the segments you
 sent in `segments.json`). Cancelling a scan discards that run's new reads.
 

@@ -9,6 +9,10 @@ class ApiMutationKeysScans {
     return ['scans', 'start'];
   }
 
+  static enqueue() {
+    return ['scans', 'enqueue'];
+  }
+
   static cancel() {
     return ['scans', 'cancel'];
   }

@@ -20,6 +20,7 @@ import {
 
 import {
   AnyDirectionValue,
+  isScanRunning,
   RunnerListScope,
   SwipeSpeedDefault,
   SwipeSpeedStorageKey
@@ -89,6 +90,9 @@ import {
   RunnersSpottedPanel
 } from './components/RunnersSpottedPanel';
 import {
+  ScanVideosDialog
+} from './components/ScanVideosDialog';
+import {
   VideoPlayerCard
 } from './components/VideoPlayerCard';
 import {
@@ -136,6 +140,8 @@ const DefaultOverlaySettings: OverlaySettings = {
 
 const SeekLeadSeconds = 2;
 
+const AppTitle = 'bibwatch';
+
 export const ViewerPageScreen = () => {
   const [controller] = useState(() => new VideoPlaybackController());
   const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
@@ -169,6 +175,7 @@ export const ViewerPageScreen = () => {
   const [isClockDialogOpen, setIsClockDialogOpen] = useState(false);
   const [isBibNumbersDialogOpen, setIsBibNumbersDialogOpen] = useState(false);
   const [isClearScansDialogOpen, setIsClearScansDialogOpen] = useState(false);
+  const [isScanVideosDialogOpen, setIsScanVideosDialogOpen] = useState(false);
   const [isOpenFolderDialogOpen, setIsOpenFolderDialogOpen] = useState(false);
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const [clockDialogVideoTime, setClockDialogVideoTime] = useState(0);
@@ -511,6 +518,12 @@ export const ViewerPageScreen = () => {
 
   const isPicking = Boolean(session.finishLinePoints);
   const hasVideo = session.videoSource !== null;
+  const videoName = session.videoSource?.name ?? null;
+
+  // The tab names the open video, so several open tabs are told apart.
+  useEffect(() => {
+    document.title = videoName ? `${videoName} | ${AppTitle}` : AppTitle;
+  }, [videoName]);
 
   const moreMenu = (
     <ViewerMoreMenu
@@ -550,6 +563,7 @@ export const ViewerPageScreen = () => {
         isScanButtonShown={session.isServerAvailable}
         isScanButtonDisabled={!session.canScan}
         isScanning={session.isScanning}
+        onScanSeveralClick={() => setIsScanVideosDialogOpen(true)}
         onOpenFolderClick={() => setIsOpenFolderDialogOpen(true)}
         onSelectVideo={session.openLibraryVideo}
         onScanClick={handleScanClick}
@@ -668,6 +682,15 @@ export const ViewerPageScreen = () => {
         onOpenChange={setIsBibNumbersDialogOpen}
         onSave={handleSaveBibNumbers}
       />
+      <ScanVideosDialog
+        isOpen={isScanVideosDialogOpen}
+        videos={libraryVideos}
+        scanningVideoName={isScanRunning(session.scanStatus?.state) ? session.scanStatus?.video ?? null : null}
+        queuedVideoNames={session.scanQueue}
+        onOpenChange={setIsScanVideosDialogOpen}
+        onScan={session.scanVideos}
+      />
+
       <ClearScansDialog
         isOpen={isClearScansDialogOpen}
         videoName={session.mediaVideo ?? ''}

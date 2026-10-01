@@ -66,6 +66,7 @@ import {
   CameraSegmentDto,
   DetectionsDto,
   ManualReadDto,
+  ScanStatusGetResponseDto,
   SegmentsFileDto,
   SightingDto,
   SightingSearchResultDto,
@@ -260,6 +261,10 @@ export const useViewerSession = ({
   const saveTags = tagsSaveMutation.mutateAsync;
   const startScanJob = scanStartMutation.mutateAsync;
   const cancelScanJob = scanCancelMutation.mutate;
+  const {
+    scanEnqueueMutation
+  } = ScansMutations.useEnqueue();
+  const enqueueScanJobs = scanEnqueueMutation.mutateAsync;
   const clearScanFiles = scanClearMutation.mutateAsync;
 
   const manualReads = useMemo(() => manualReadsOf(tags), [tags]);
@@ -744,13 +749,15 @@ export const useViewerSession = ({
     scanStatusGetQuery
   } = ScansQueries.useGetStatus({
     enabled: isServerAvailable,
-    refetchInterval: (query) => (isScanRunning(query.state.data?.state) ? 1000 : false),
+    refetchInterval: (query) => (isScanRunning(query.state.data?.state) || query.state.data?.queue?.length ? 1000 : false),
   });
   const scanStatus = scanStatusGetQuery.data ?? null;
-  const isScanning = isScanRunning(scanStatus?.state);
-  const isScanningThisVideo = isScanning && scanStatus?.video === mediaVideo;
+  const scanQueue = useMemo(() => scanStatus?.queue ?? [], [scanStatus]);
+  const isScanning = isScanRunning(scanStatus?.state) || scanQueue.length > 0;
+  const isScanningThisVideo = isScanRunning(scanStatus?.state) && scanStatus?.video === mediaVideo;
   const lastCheckpointRef = useRef<number | null>(null);
   const wasScanningRef = useRef(false);
+  const previousScanStatusRef = useRef<ScanStatusGetResponseDto | null>(null);
 
   useEffect(() => {
     if (!scanStatus) {
@@ -760,6 +767,24 @@ export const useViewerSession = ({
     const wasScanning = wasScanningRef.current;
     wasScanningRef.current = isScanning;
     const justFinished = wasScanning && !isScanning;
+
+    // Scanning several videos: the one before has finished and the next one started in between polls.
+    const previous = previousScanStatusRef.current;
+    previousScanStatusRef.current = scanStatus;
+    const movedOn = Boolean(previous && isScanRunning(previous.state) && previous.video !== scanStatus.video);
+    if (movedOn && previous) {
+      getQueryClient().invalidateQueries({
+        queryKey: ApiQueryKeys.Media.getOverview(),
+      });
+      if (previous.video === mediaVideoRef.current && previous.partial) {
+        lastCheckpointRef.current = null;
+        MediaApi.getDetections({
+          url: previous.partial,
+        })
+          .then((json) => applyScanResults(json as DetectionsDto))
+          .catch(() => undefined);
+      }
+    }
     const isThisVideo = scanStatus.video === mediaVideoRef.current;
     const hasNewCheckpoint = Boolean(scanStatus.partial && scanStatus.checkpoint && scanStatus.checkpoint !== lastCheckpointRef.current);
 
@@ -779,6 +804,21 @@ export const useViewerSession = ({
     getQueryClient().invalidateQueries({
       queryKey: ApiQueryKeys.Media.getOverview(),
     });
+
+    const finished = scanStatus.finished ?? [];
+    if (finished.length > 1) {
+      const failed = finished.filter((scan) => scan.state === ScanStateId.Failed);
+      const stopped = finished.some((scan) => scan.state === ScanStateId.Cancelled);
+      const doneCount = finished.filter((scan) => scan.state === ScanStateId.Done).length;
+      toast.add({
+        title: stopped ? `Scans stopped after ${doneCount} of ${finished.length} videos` : `Scanned ${doneCount} of ${finished.length} videos`,
+        description: failed.length
+          ? `Failed: ${failed.map((scan) => `${scan.video} (${scan.message || 'unknown error'})`).join(', ')}`
+          : finished.map((scan) => scan.video).join(', '),
+        type: failed.length ? 'error' : stopped ? 'info' : 'success',
+      });
+      return;
+    }
 
     if (scanStatus.state === ScanStateId.Done) {
       toast.add({
@@ -817,7 +857,8 @@ export const useViewerSession = ({
       const percent = scanStatus.total ? ` ${Math.round(fraction * 100)}%` : '';
       const phase = ScanPhaseLabels[scanStatus.phase ?? ''] ?? 'Starting…';
       const otherVideo = scanStatus.video !== mediaVideo ? ` ${scanStatus.video}:` : '';
-      return `${otherVideo} ${phase}${percent}${formatEta(scanStatus.eta)}`.trim();
+      const queued = scanQueue.length ? ` · ${scanQueue.length} more queued` : '';
+      return `${otherVideo} ${phase}${percent}${formatEta(scanStatus.eta)}${queued}`.trim();
     }
 
     if (!mediaVideo) {
@@ -833,7 +874,7 @@ export const useViewerSession = ({
     }
 
     return 'Scan finished';
-  }, [detections, isScanning, isServerAvailable, mediaVideo, scanStatus]);
+  }, [detections, isScanning, isServerAvailable, mediaVideo, scanQueue, scanStatus]);
 
   const scanProgress = isScanning && scanStatus?.total ? (scanStatus.done ?? 0) / scanStatus.total : null;
 
@@ -882,6 +923,26 @@ export const useViewerSession = ({
       });
     }
   }, [clockOffset, controller, isPeopleFirst, isScanning, mediaVideo, cancelScanJob, startScanJob, segments, segmentsFile]);
+
+  /** Scans the videos one after another, each from its start with its saved camera positions, clock and people-only setting. */
+  const scanVideos = useCallback(async (videos: string[]) => {
+    if (!videos.length) {
+      return;
+    }
+
+    try {
+      await enqueueScanJobs({
+        videos,
+      });
+      lastCheckpointRef.current = null;
+    } catch (error) {
+      toast.add({
+        title: 'Could not start the scans',
+        description: describeError(error),
+        type: 'error',
+      });
+    }
+  }, [enqueueScanJobs]);
 
   const scanMadeWithPeopleFirst = detections?.settings ? detections.settings.reader === 'people-first' : null;
 
@@ -971,6 +1032,7 @@ export const useViewerSession = ({
     autosaveStatus,
     autosaveErrorMessage,
     scanStatus,
+    scanQueue,
     scanStatusText,
     scanProgress,
     scanButtonLabel,
@@ -993,6 +1055,7 @@ export const useViewerSession = ({
     removeRunner,
     exportSegments,
     startScan,
+    scanVideos,
     clearScans,
     openSearchResult,
   };

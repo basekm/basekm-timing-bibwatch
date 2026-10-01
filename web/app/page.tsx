@@ -7,7 +7,6 @@ import {
 } from '@basekm/screens/ViewerPageScreen';
 
 export const metadata: Metadata = {
-  title: 'Viewer',
   description: 'Race video with every bib found, the finish line and the runners spotted.',
 };
 
