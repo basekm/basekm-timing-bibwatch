@@ -1,4 +1,5 @@
 import {
+  FolderBrowseGetRequestDto,
   SightingSearchQueryDto
 } from '@basekm/dtos';
 import {
@@ -37,6 +38,16 @@ class ApiQueryKeysEvent {
   }
 }
 
+class ApiQueryKeysFolders {
+  static getFolders() {
+    return ['folders'];
+  }
+
+  static browse(data: PayloadOnly<FolderBrowseGetRequestDto>) {
+    return ['folders', 'browse', data.path ?? ''];
+  }
+}
+
 class ApiQueryKeysSightings {
   static search(data: PayloadOnly<SightingSearchQueryDto>) {
     return ['sightings', 'search', data.bib ?? '', data.tag ?? '', data.video ?? ''];
@@ -54,6 +65,10 @@ export class ApiQueryKeys {
 
   static get Event() {
     return ApiQueryKeysEvent;
+  }
+
+  static get Folders() {
+    return ApiQueryKeysFolders;
   }
 
   static get Tags() {

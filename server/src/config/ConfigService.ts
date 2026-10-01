@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService as NestConfigService } from '@nestjs/config';
 
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 
 // The repo root holds Package.swift; found by walking up so it works from src/ (tests) and dist/.
@@ -27,18 +28,9 @@ export class ConfigService {
     return Number(this.nestConfigService.get<string>('PORT') || 8765);
   }
 
-  get MediaFolder() {
-    const folder = this.nestConfigService.get<string>('MEDIA_FOLDER');
-    return folder ? path.resolve(folder) : null;
-  }
-
-  /** Defaults to <media>/bibwatch.sqlite: the sightings and tags travel with the videos they describe. */
-  get DatabaseSQLiteFile() {
-    const file = this.nestConfigService.get<string>('DATABASE_SQLITE_FILE');
-    if (file) {
-      return path.resolve(file);
-    }
-    return this.MediaFolder ? path.join(this.MediaFolder, 'bibwatch.sqlite') : null;
+  /** The folder open in the viewer and the recently opened ones, kept between restarts. */
+  get FolderStateFile() {
+    return path.join(os.homedir(), 'Library', 'Application Support', 'bibwatch', 'folders.json');
   }
 
   get RepoFolder() {

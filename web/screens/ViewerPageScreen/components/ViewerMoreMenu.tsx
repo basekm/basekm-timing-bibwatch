@@ -45,9 +45,11 @@ type ViewerMoreMenuProps = {
   bibNumbersSummary: string;
   hasVideo: boolean;
   canClearScans: boolean;
+  isFolderAvailable: boolean;
   isPeopleFirst: boolean;
   overlaySettings: OverlaySettings;
   swipeSpeed: number;
+  onOpenFolder: () => void;
   onOpenVideoFile: () => void;
   onOpenBibNumbers: () => void;
   onSetRaceClock: () => void;
@@ -78,9 +80,11 @@ export const ViewerMoreMenu = ({
   bibNumbersSummary,
   hasVideo,
   canClearScans,
+  isFolderAvailable,
   isPeopleFirst,
   overlaySettings,
   swipeSpeed,
+  onOpenFolder,
   onOpenVideoFile,
   onOpenBibNumbers,
   onSetRaceClock,
@@ -118,6 +122,7 @@ export const ViewerMoreMenu = ({
       >
         <DropdownMenuGroup>
           <DropdownMenuLabel className={sectionLabelClassName}>Open files</DropdownMenuLabel>
+          {isFolderAvailable && <DropdownMenuItem onClick={onOpenFolder}>Open folder…</DropdownMenuItem>}
           <DropdownMenuItem onClick={onOpenVideoFile}>Open video file…</DropdownMenuItem>
         </DropdownMenuGroup>
 

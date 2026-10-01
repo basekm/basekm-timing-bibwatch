@@ -80,6 +80,7 @@ export const useAutosave = () => {
   return {
     autosaveStatus: status,
     autosaveErrorMessage: errorMessage,
+    hasPendingSaves,
     scheduleSave,
     cancelSaves,
   };

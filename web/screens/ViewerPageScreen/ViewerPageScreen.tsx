@@ -45,6 +45,9 @@ import {
   EventQueries
 } from '@basekm/api';
 import {
+  OpenFolderDialog
+} from '@basekm/components/OpenFolderDialog';
+import {
   ViewerHeader,
   ViewerHeaderVideo
 } from '@basekm/components/ViewerHeader';
@@ -166,6 +169,7 @@ export const ViewerPageScreen = () => {
   const [isClockDialogOpen, setIsClockDialogOpen] = useState(false);
   const [isBibNumbersDialogOpen, setIsBibNumbersDialogOpen] = useState(false);
   const [isClearScansDialogOpen, setIsClearScansDialogOpen] = useState(false);
+  const [isOpenFolderDialogOpen, setIsOpenFolderDialogOpen] = useState(false);
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const [clockDialogVideoTime, setClockDialogVideoTime] = useState(0);
   const [personToAdd, setPersonToAdd] = useState<PersonToAdd | null>(null);
@@ -517,6 +521,8 @@ export const ViewerPageScreen = () => {
       isPeopleFirst={session.isPeopleFirst}
       overlaySettings={overlaySettings}
       swipeSpeed={Number(swipeSpeed)}
+      isFolderAvailable={session.mediaOverview !== null}
+      onOpenFolder={() => setIsOpenFolderDialogOpen(true)}
       onOpenVideoFile={() => videoFileInputRef.current?.click()}
       onOpenBibNumbers={() => setIsBibNumbersDialogOpen(true)}
       onSetRaceClock={openClockDialog}
@@ -532,6 +538,8 @@ export const ViewerPageScreen = () => {
   return (
     <div className="flex min-h-screen flex-col bg-muted/50">
       <ViewerHeader
+        folderName={session.folder?.name ?? null}
+        isFolderButtonShown={session.mediaOverview !== null}
         videos={libraryVideos}
         selectedVideoName={session.videoSource?.name ?? null}
         saveState={session.autosaveStatus}
@@ -542,6 +550,7 @@ export const ViewerPageScreen = () => {
         isScanButtonShown={session.isServerAvailable}
         isScanButtonDisabled={!session.canScan}
         isScanning={session.isScanning}
+        onOpenFolderClick={() => setIsOpenFolderDialogOpen(true)}
         onSelectVideo={session.openLibraryVideo}
         onScanClick={handleScanClick}
         actions={moreMenu}
@@ -581,8 +590,10 @@ export const ViewerPageScreen = () => {
           {!hasVideo && (
             <EmptyViewerState
               videos={libraryVideos}
-              isServerAvailable={session.isServerAvailable}
+              folderName={session.folder?.name ?? null}
+              isServerUp={session.mediaOverview !== null}
               onSelectVideo={session.openLibraryVideo}
+              onOpenFolder={() => setIsOpenFolderDialogOpen(true)}
               onOpenVideoFile={() => videoFileInputRef.current?.click()}
             />
           )}
@@ -663,6 +674,13 @@ export const ViewerPageScreen = () => {
         durationSeconds={duration}
         onOpenChange={setIsClearScansDialogOpen}
         onClear={session.clearScans}
+      />
+
+      <OpenFolderDialog
+        isOpen={isOpenFolderDialogOpen}
+        isOpening={session.isOpeningFolder}
+        onOpenChange={setIsOpenFolderDialogOpen}
+        onOpenFolder={session.openFolder}
       />
 
       <ConfirmDialog

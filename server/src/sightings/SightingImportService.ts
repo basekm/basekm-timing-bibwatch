@@ -1,9 +1,10 @@
-import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
 import { SightingDto } from '../@shared/dto/SightingsSaveRequestDto';
+import { FolderService } from '../folder/FolderService';
 import { MediaService } from '../media/MediaService';
 import { VideoService } from '../videos/VideoService';
 
@@ -20,7 +21,7 @@ const parseClock = (clock: string) => {
  * and tags.json from before tags moved into the database.
  */
 @Injectable()
-export class SightingImportService implements OnApplicationBootstrap {
+export class SightingImportService {
   private readonly logger = new Logger(SightingImportService.name);
 
   constructor(
@@ -28,17 +29,22 @@ export class SightingImportService implements OnApplicationBootstrap {
     private readonly sightingService: SightingService,
     private readonly tagService: TagService,
     private readonly videoService: VideoService,
-  ) {}
-
-  onApplicationBootstrap() {
+    folderService: FolderService,
+  ) {
     // In the background: the viewer is usable while a large media folder is being read in.
-    void this.importAll().catch((error) => this.logger.error(`import failed: ${error?.message ?? error}`));
+    folderService.onOpened((folder) => {
+      void this.importAll(folder).catch((error) => this.logger.error(`import failed: ${error?.message ?? error}`));
+    });
   }
 
-  async importAll() {
+  async importAll(folder: string) {
     let sightings = 0;
     let tags = 0;
     for (const video of await this.mediaService.getVideos()) {
+      // Another folder was opened meanwhile: its own import takes over.
+      if (this.mediaService.folder !== folder) {
+        return;
+      }
       if (await this.importDetections(video)) {
         sightings += 1;
       }

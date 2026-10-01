@@ -52,6 +52,7 @@ import {
 } from '@basekm/@shared/utils/sightingTags';
 import {
   ApiQueryKeys,
+  FoldersMutations,
   MediaApi,
   MediaMutations,
   MediaQueries,
@@ -167,7 +168,9 @@ export const useViewerSession = ({
     mediaOverviewGetQuery
   } = MediaQueries.useGetOverview();
   const mediaOverview = mediaOverviewGetQuery.data ?? null;
-  const isServerAvailable = mediaOverview !== null;
+  const folder = mediaOverview?.folder ?? null;
+  // Up, with a folder open: everything that reads or saves through the server.
+  const isServerAvailable = folder !== null;
 
   const [videoSource, setVideoSource] = useState<VideoSource | null>(null);
   const [detections, setDetections] = useState<DetectionsDto | null>(null);
@@ -191,8 +194,42 @@ export const useViewerSession = ({
   const {
     autosaveStatus,
     autosaveErrorMessage,
+    hasPendingSaves,
     scheduleSave,
   } = useAutosave();
+
+  const {
+    folderOpenMutation
+  } = FoldersMutations.useOpen();
+
+  /** Work in another folder: the page starts over with its videos (the last edits are saved first). */
+  const openFolder = useCallback(async (path: string) => {
+    if (hasPendingSaves()) {
+      toast.add({
+        title: 'Still saving your changes',
+        description: 'Try again in a moment, so they’re saved in this folder.',
+        type: 'info',
+      });
+      return false;
+    }
+
+    try {
+      await folderOpenMutation.mutateAsync({
+        path,
+      });
+    } catch (error) {
+      toast.add({
+        title: 'Could not open the folder',
+        description: describeError(error),
+        type: 'error',
+      });
+      return false;
+    }
+
+    writeSelectedVideo(null);
+    window.location.assign('/');
+    return true;
+  }, [folderOpenMutation, hasPendingSaves]);
 
   const {
     videoClockSaveMutation
@@ -910,7 +947,10 @@ export const useViewerSession = ({
 
   return {
     mediaOverview,
+    folder,
     isServerAvailable,
+    openFolder,
+    isOpeningFolder: folderOpenMutation.isPending,
     videoSource,
     mediaVideo,
     detections,

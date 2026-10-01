@@ -89,7 +89,7 @@ const BibNumbersForm = ({
       <DialogHeader>
         <DialogTitle>Bib numbers at this event</DialogTitle>
         <DialogDescription>
-          For every video in this media folder. Races can mix lengths, e.g. 4-digit 5K bibs and 6-digit marathon bibs.
+          For every video in this folder. Races can mix lengths, e.g. 4-digit 5K bibs and 6-digit marathon bibs.
         </DialogDescription>
       </DialogHeader>
 

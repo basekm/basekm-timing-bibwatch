@@ -11,6 +11,7 @@ import { pathExists } from '../@shared/lib/pathExists';
 import { writeJsonAtomic } from '../@shared/lib/writeJsonAtomic';
 import { BibwatchService } from '../bibwatch/BibwatchService';
 import { EventService } from '../event/EventService';
+import { FolderService } from '../folder/FolderService';
 import { MediaService } from '../media/MediaService';
 import { SightingImportService } from '../sightings/SightingImportService';
 import { SightingService } from '../sightings/SightingService';
@@ -28,7 +29,17 @@ export class ScanService {
     private readonly mediaService: MediaService,
     private readonly sightingService: SightingService,
     private readonly sightingImportService: SightingImportService,
-  ) {}
+    folderService: FolderService,
+  ) {
+    // A scan writes into the open folder until it ends.
+    folderService.addBusyCheck(() =>
+      this.job?.isRunning ? `a scan is running (${this.job.video}) — stop it before opening another folder` : null,
+    );
+    // The last scan's status belongs to the folder it ran in.
+    folderService.onOpened(() => {
+      this.job = null;
+    });
+  }
 
   async getStatus() {
     return this.job ? this.job.getStatus() : { state: ScanStateId.Idle };
