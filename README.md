@@ -8,38 +8,46 @@ Built for checking chip-timing results (missed reads, no-shows, disputes) agains
 footage. **Everything runs on this Mac** (AVFoundation + Apple Vision). No frames are
 saved and nothing is uploaded; the viewer opens the video straight from disk.
 
-## Build
+## Start
+
+On any Mac with Xcode (or `xcode-select --install`) and Node 22 or newer:
 
 ```bash
-swift build -c release                  # binary: .build/release/bibwatch
-cd web && npm install && npm run build  # the viewer (Next.js, its own process)
-cd server && npm install                # the API and media server (NestJS, Node 22)
+./start.sh
 ```
 
-## Quick start (from the viewer)
+It builds whatever is missing or out of date (the scanner, both apps' packages and builds —
+the first run takes a few minutes, later ones start straight away), starts the server and the
+viewer, and opens http://localhost:3000. Ctrl-C stops both. No configuration: the race videos
+are picked in the viewer. `./start.sh --port 9000 --web-port 3001 --no-open` if the ports are taken.
+
+By hand, the same thing is:
 
 ```bash
-swift build -c release
-mkdir -p media && ln -s "/path/GX011760.MP4" media/     # videos (symlinks are fine)
-cp targets.txt media/                                  # optional: bib numbers to watch
-(cd server && npm install && npm run build && MEDIA_FOLDER=../media npm run start:prod) &   # API on :8765
-cd web && npm install && npm run build && npm run start                                     # http://localhost:3000/
+swift build -c release                                       # binary: .build/release/bibwatch
+(cd server && npm ci && npm run build && npm run start:prod) &   # API on :8765
+cd web && npm ci && npm run build && npm run start               # http://localhost:3000/
 ```
 
-Or put `MEDIA_FOLDER` (and `PORT`) in `server/.env.development` / `.env.production`
-(see `server/.env.example`); `npm run dev` rebuilds and restarts on changes.
+Working on the code: `npm run dev` in `server/` and `web/` rebuild and restart on changes.
 
-1. Pick the video from the **Video** list at the top.
-2. **Run scan** (top right) — progress is shown next to it (finding camera positions →
+1. **Open folder…** (top left): browse to the folder with the race videos — one folder per
+   event, e.g. a camera card or `~/Desktop/Race day` (symlinked videos are fine; put
+   `targets.txt` in it to watch bib numbers). Scans, runners, tags and race clocks are saved
+   inside that folder, so it carries everything with it. The last folder is opened again when the
+   server starts; **Recent** in the dialog switches between events. A folder can't be switched
+   while a scan is running.
+2. Pick the video from the **Video** list at the top.
+3. **Run scan** (top right) — progress is shown next to it (finding camera positions →
    reading bibs → following runners); runners appear in the list as they are found.
-3. **Mark finish line** for each camera position where it's visible (**M**) — optional: without a
+4. **Mark finish line** for each camera position where it's visible (**M**) — optional: without a
    finish line, bibs there are tagged **001 Viewed** instead of **000 Crossed the mat**; split camera positions if needed
    (**S**), set the race clock. Every change applies **instantly**: finishes are
    re-decided from the reads already made, no re-scan needed.
-4. If a change needs frames that were never read, those runners show *Not read here yet* —
+5. If a change needs frames that were never read, those runners show *Not read here yet* —
    **Scan again** only reads the missing frames and adds them to what's there.
 
-Reads accumulate per video in `media/scans/<video>/detections.json` (with the segments you
+Reads accumulate per video in `<folder>/scans/<video>/detections.json` (with the segments you
 sent in `segments.json`). Cancelling a scan discards that run's new reads.
 
 ### People only (on by default)
@@ -57,15 +65,14 @@ where the time goes.
 
 ## Search all videos
 
-**All videos** (above the runner list) finds a bib, or a tag, in every video of the media folder:
+**All videos** (above the runner list) finds a bib, or a tag, in every video of the open folder:
 type `147` (finds 0147) or `finisher`; click a result to open that video at that moment.
 Results are sorted by reader time, so set the race clock (**Set…** on the video) on each video to line up
 the same runner across cameras. API: `GET /api/sightings?bib=147` or `?tag=finisher`.
 
-This comes from the server's SQLite database, `<media>/bibwatch.sqlite` (or
-`DATABASE_SQLITE_FILE`): the sightings of every video as last decided (a finished scan, or a
+This comes from the open folder's SQLite database, `<folder>/bibwatch.sqlite`: the sightings of every video as last decided (a finished scan, or a
 re-sync in the viewer), your tags and each video's clock. `detections.json` stays the scanner's
-output; on start the server reads in any that are newer than what it has, and any `tags.json`
+output; when a folder is opened the server reads in any that are newer than what it has, and any `tags.json`
 from before tags moved into the database.
 
 ## The viewer at a glance
@@ -114,11 +121,11 @@ the videos fill the screen, in the grid that shows them largest for how many the
 
 **⋯ More › Bib numbers…** sets how many digits bib numbers have at this event — races can mix
 lengths (e.g. 4 to 6: 4-digit 5K bibs, 6-digit marathon bibs) — and optionally the lowest and
-highest bib. It is saved in the event's database (the media folder), so every video of the event
+highest bib. It is saved in the event's database (the open folder), so every video of the event
 is scanned with it. A number one digit shorter than the fewest is kept as a partial read.
 The classic 4 digits keeps the zero-padding earlier scans use ("147" is stored as "0147").
 
-Put the participant list in the media folder as **`registered.txt`** (one bib number per line,
+Put the participant list in the event folder as **`registered.txt`** (one bib number per line,
 next to the videos). Bibs not in it are tagged *006 Not registered*, and with no highest bib set
 the highest registered number is used. With mixed lengths it matters most: only the list tells a
 5-digit bib from a 6-digit one with a digit hidden. Changing the rules makes the next scan of
@@ -273,7 +280,7 @@ the viewer; the viewer passes `/api` and `/media` on to the server, so the brows
 to the viewer:
 
 ```bash
-cd server && MEDIA_FOLDER=../out/media npm run start:prod    # :8765, binds 127.0.0.1 only
+cd server && npm run start:prod                              # :8765, binds 127.0.0.1 only
 cd web && npm run build && npm run start                     # http://localhost:3000
 # http://localhost:3000/?video=/media/GX011759.MP4&data=/media/detections.json
 ```
@@ -282,8 +289,8 @@ The server's address is `BIBWATCH_SERVER_URL` (default http://127.0.0.1:8765; se
 `web/.env.example`). It is fixed into the build, so set it before `npm run build`. The viewer
 starts without the server, but the video list, scans and saving need it.
 
-Put the video (a symlink is fine) and JSON in the `MEDIA_FOLDER`. Without a media folder you
-can still drop a video and its JSON on the page (or **⋯ More › Open video file…**); nothing is
+Put the video (a symlink is fine) and JSON in a folder and open it in the viewer. Without a
+folder you can still drop a video and its JSON on the page (or **⋯ More › Open video file…**); nothing is
 uploaded.
 
 Working on the viewer: `cd web && npm run dev` instead of build + start —
@@ -291,8 +298,8 @@ http://localhost:3000 with hot reload. The app follows
 `basekm-timing-engine-web` (structure, shadcn/ui primitives, theme); see `web/.agents/skills/`.
 
 The server (`server/`) is a NestJS app laid out like `basekm-timing-backend`: one module per
-area (`media`, `scans`, `bibwatch` runs the Swift binary), DTOs and constants in
-`src/@shared`. It serves the media folder at `/media/` (with HTTP Range, so
+area (`folder` opens a folder and its database, `media`, `scans`, `bibwatch` runs the Swift binary), DTOs and constants in
+`src/@shared`. It serves the open folder at `/media/` (with HTTP Range, so
 video seeking works) and the API at `/api/`.
 
 GoPro files are HEVC. Safari and Chrome on macOS play them. If a browser can't, make a
