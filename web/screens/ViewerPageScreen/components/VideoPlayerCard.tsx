@@ -260,7 +260,7 @@ export const VideoPlayerCard = ({
 
           <button
             type="button"
-            title={isOverlayShown ? 'Hide boxes and bib numbers' : 'Show boxes and bib numbers'}
+            title={isOverlayShown ? 'Hide boxes and bib numbers (B)' : 'Show boxes and bib numbers (B)'}
             className={controlButtonClassName}
             onClick={onToggleOverlay}
           >

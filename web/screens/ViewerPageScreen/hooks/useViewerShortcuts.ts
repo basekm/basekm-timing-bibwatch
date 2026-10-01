@@ -16,6 +16,7 @@ import {
 type ViewerShortcutActions = {
   onToggleFinishLineMarking: () => void;
   onSplitCameraPosition: () => void;
+  onToggleOverlay: () => void;
   onToggleTag: (tag: string) => void;
   onEscape: () => void;
 };
@@ -85,6 +86,11 @@ export const useViewerShortcuts = ({
 
       if (key === 's') {
         current.onSplitCameraPosition();
+        return;
+      }
+
+      if (key === 'b') {
+        current.onToggleOverlay();
         return;
       }
 

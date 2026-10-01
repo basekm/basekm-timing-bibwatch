@@ -88,7 +88,7 @@ The viewer is a Next.js app in `web/` (shadcn/ui + Tailwind, laid out and themed
 
 - **Header**: the video list, how many runners were spotted, *Saved automatically*, the scan
   status and **Run scan / Scan again / Stop scan**, **All cameras**, and **⋯ More**.
-- **Video**: boxes and bib numbers drawn on top, the race clock (top left), play, ±1 s, speed.
+- **Video**: boxes and bib numbers drawn on top (**B** shows / hides them), the race clock (top left), play, ±1 s, speed.
 - **Timeline** (under the video): every runner as a marker, camera positions underneath;
   Ctrl + scroll (or the slider) zooms, **Fit all** zooms out.
 - **Mark and annotate**: previous / next runner, **Mark finish line**, **Split camera position here**.

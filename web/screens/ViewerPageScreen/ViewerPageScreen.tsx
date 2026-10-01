@@ -427,6 +427,7 @@ export const ViewerPageScreen = () => {
     actions: {
       onToggleFinishLineMarking: session.toggleFinishLineMarking,
       onSplitCameraPosition: session.splitSegmentHere,
+      onToggleOverlay: () => setIsOverlayShown((isShown) => !isShown),
       onToggleTag: session.toggleTag,
       onEscape: handleEscape,
     },

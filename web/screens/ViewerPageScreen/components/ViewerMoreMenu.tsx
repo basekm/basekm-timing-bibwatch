@@ -68,6 +68,7 @@ const KeyboardShortcuts = [
   ['J / K / L', 'Back 1 s / pause / play faster'],
   ['M', 'Draw finish line'],
   ['S', 'Camera moved here'],
+  ['B', 'Show / hide boxes'],
   ['1–4', 'Tag the selected runner'],
   ['Esc', 'Stop marking or picking'],
   ['⌥ + swipe', '10× faster scrubbing'],
