@@ -21,7 +21,7 @@ export class SightingSearchQueryDto {
   }
 
   get isValid() {
-    return Boolean(this.bib?.trim() || this.tag?.trim());
+    return Boolean(this.bib?.trim() || this.tag?.trim() || this.video?.trim());
   }
 
   /** The bib as typed, plus zero-padded to 4 (how 4-digit events store "0147"; 147 finds it). */

@@ -421,7 +421,6 @@ export const ViewerPageScreen = () => {
     },
   });
 
-  // "All cameras" opens a camera here at the moment it was showing (?camera=…&t=…).
   const pendingSeekRef = useRef<number | null>(null);
 
   useEffect(() => {

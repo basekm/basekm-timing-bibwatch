@@ -11,7 +11,6 @@ import {
   LayoutGridIcon,
   Loader2Icon
 } from 'lucide-react';
-import Image from 'next/image';
 import Link from 'next/link';
 
 import {
@@ -30,6 +29,10 @@ import {
 import {
   SaveState
 } from '@basekm/@shared/constants';
+
+import {
+  AppHeader
+} from './AppHeader';
 
 export type ViewerHeaderVideo = {
   name: string;
@@ -112,114 +115,102 @@ export const ViewerHeader = ({
   const scanProgressWidth = scanProgress === null ? null : `${Math.round(scanProgress * 100)}%`;
 
   return (
-    <header className="sticky top-0 z-10 flex h-14 w-full items-center justify-between gap-3 border-b border-border/50 bg-background/85 px-3 backdrop-blur-md sm:px-4">
-      <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-        <div className="flex shrink-0 items-center gap-2">
-          <Image
-            src="/logo.svg"
-            alt=""
-            width={22}
-            height={22}
+    <AppHeader
+      actions={(
+        <>
+          <SaveStateIndicator
+            saveState={saveState}
+            saveErrorMessage={saveErrorMessage}
           />
-          <span className="text-sm font-extrabold tracking-tight">bibwatch</span>
-        </div>
 
-        <div className="h-4 w-px shrink-0 bg-border" />
-
-        <div className="flex min-w-0 items-center gap-2 text-xs font-semibold">
-          <span className="hidden text-muted-foreground sm:inline">Video:</span>
-
-          {hasVideoList && (
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={(
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="max-w-56 justify-between gap-1.5 font-bold sm:max-w-72"
+          {scanStatusText && (
+            <span className="hidden max-w-72 flex-col items-end gap-1 xl:flex">
+              <span className="truncate text-xs font-medium text-muted-foreground">{scanStatusText}</span>
+              {scanProgressWidth && (
+                <span className="h-1 w-40 overflow-hidden rounded-full bg-muted">
+                  <span
+                    className="block h-full rounded-full bg-primary transition-[width] duration-500"
+                    style={{
+                      width: scanProgressWidth,
+                    }}
                   />
-                )}
-              >
-                <span className="truncate">{videoPickerLabel}</span>
-                <ChevronDownIcon data-icon="inline-end" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="max-h-96 w-80">
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel>Videos in the media folder</DropdownMenuLabel>
-                  <DropdownMenuRadioGroup
-                    value={selectedVideoName ?? ''}
-                    onValueChange={(value) => onSelectVideo(String(value))}
-                  >
-                    {videos.map((video) => (
-                      <DropdownMenuRadioItem
-                        key={video.name}
-                        value={video.name}
-                      >
-                        <span className="truncate">{video.name}</span>
-                        {video.isScanned && <span className="ml-auto text-xs text-emerald-600">scanned</span>}
-                      </DropdownMenuRadioItem>
-                    ))}
-                  </DropdownMenuRadioGroup>
-                </DropdownMenuGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                </span>
+              )}
+            </span>
           )}
 
-          {!hasVideoList && (
-            <span className="truncate font-bold text-foreground">{videoPickerLabel}</span>
+          {isScanButtonShown && (
+            <Button
+              size="sm"
+              variant={isScanning ? 'outline' : 'default'}
+              disabled={isScanButtonDisabled}
+              className="px-3.5 font-bold"
+              onClick={onScanClick}
+            >
+              {isScanning && <Loader2Icon className="animate-spin" data-icon="inline-start" />}
+              {scanButtonLabel}
+            </Button>
           )}
-        </div>
-      </div>
 
-      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-        <SaveStateIndicator
-          saveState={saveState}
-          saveErrorMessage={saveErrorMessage}
-        />
-
-        {scanStatusText && (
-          <span className="hidden max-w-72 flex-col items-end gap-1 xl:flex">
-            <span className="truncate text-xs font-medium text-muted-foreground">{scanStatusText}</span>
-            {scanProgressWidth && (
-              <span className="h-1 w-40 overflow-hidden rounded-full bg-muted">
-                <span
-                  className="block h-full rounded-full bg-primary transition-[width] duration-500"
-                  style={{
-                    width: scanProgressWidth,
-                  }}
-                />
-              </span>
-            )}
-          </span>
-        )}
-
-        {isScanButtonShown && (
           <Button
+            variant="outline"
             size="sm"
-            variant={isScanning ? 'outline' : 'default'}
-            disabled={isScanButtonDisabled}
-            className="px-3.5 font-bold"
-            onClick={onScanClick}
+            className="font-bold"
+            title="Every camera on one race clock"
+            render={<Link href="/cameras" />}
+            nativeButton={false}
           >
-            {isScanning && <Loader2Icon className="animate-spin" data-icon="inline-start" />}
-            {scanButtonLabel}
+            <LayoutGridIcon data-icon="inline-start" />
+            <span className="hidden sm:inline">All cameras</span>
           </Button>
+
+          {actions}
+        </>
+      )}
+    >
+      <div className="flex min-w-0 items-center gap-2 text-xs font-semibold">
+        <span className="hidden text-muted-foreground sm:inline">Video:</span>
+
+        {hasVideoList && (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={(
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="max-w-56 justify-between gap-1.5 font-bold sm:max-w-72"
+                />
+              )}
+            >
+              <span className="truncate">{videoPickerLabel}</span>
+              <ChevronDownIcon data-icon="inline-end" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="max-h-96 w-80">
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>Videos in the media folder</DropdownMenuLabel>
+                <DropdownMenuRadioGroup
+                  value={selectedVideoName ?? ''}
+                  onValueChange={(value) => onSelectVideo(String(value))}
+                >
+                  {videos.map((video) => (
+                    <DropdownMenuRadioItem
+                      key={video.name}
+                      value={video.name}
+                    >
+                      <span className="truncate">{video.name}</span>
+                      {video.isScanned && <span className="ml-auto text-xs text-emerald-600">scanned</span>}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
 
-        <Button
-          variant="outline"
-          size="sm"
-          className="font-bold"
-          title="Every camera on one race clock"
-          render={<Link href="/cameras" />}
-          nativeButton={false}
-        >
-          <LayoutGridIcon data-icon="inline-start" />
-          <span className="hidden sm:inline">All cameras</span>
-        </Button>
-
-        {actions}
+        {!hasVideoList && (
+          <span className="truncate font-bold text-foreground">{videoPickerLabel}</span>
+        )}
       </div>
-    </header>
+    </AppHeader>
   );
 };

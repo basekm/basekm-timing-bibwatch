@@ -9,6 +9,20 @@ class ApiQueryKeysMedia {
   static getOverview() {
     return ['media', 'overview'];
   }
+
+  static getDetections(data: PayloadOnly<{ url: string }>) {
+    return ['media', 'detections', data.url];
+  }
+
+  static getSegments(data: PayloadOnly<{ url: string }>) {
+    return ['media', 'segments', data.url];
+  }
+}
+
+class ApiQueryKeysTags {
+  static getByUrl(data: PayloadOnly<{ url: string }>) {
+    return ['tags', data.url];
+  }
 }
 
 class ApiQueryKeysScans {
@@ -25,7 +39,7 @@ class ApiQueryKeysEvent {
 
 class ApiQueryKeysSightings {
   static search(data: PayloadOnly<SightingSearchQueryDto>) {
-    return ['sightings', 'search', data.bib ?? '', data.tag ?? ''];
+    return ['sightings', 'search', data.bib ?? '', data.tag ?? '', data.video ?? ''];
   }
 }
 
@@ -40,6 +54,10 @@ export class ApiQueryKeys {
 
   static get Event() {
     return ApiQueryKeysEvent;
+  }
+
+  static get Tags() {
+    return ApiQueryKeysTags;
   }
 
   static get Sightings() {

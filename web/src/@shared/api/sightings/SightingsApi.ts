@@ -23,6 +23,7 @@ export class SightingsApi extends BaseApi {
       query: {
         bib: data.bib,
         tag: data.tag,
+        video: data.video,
       },
     });
     const body = await response.json() as { sightings: SightingSearchResultDto[] };

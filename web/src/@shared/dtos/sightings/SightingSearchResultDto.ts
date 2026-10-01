@@ -23,4 +23,5 @@ export class SightingSearchResultDto extends AppBaseDto {
 export class SightingSearchQueryDto extends AppBaseDto {
   bib?: string;
   tag?: string;
+  video?: string;
 }

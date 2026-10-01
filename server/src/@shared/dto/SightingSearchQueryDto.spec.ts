@@ -12,9 +12,10 @@ describe('SightingSearchQueryDto.bibCandidates', () => {
     expect(candidates('0147')).toEqual(['0147']);
   });
 
-  it('needs a bib or a tag', () => {
+  it('needs a bib, a tag or a video', () => {
     expect(new SightingSearchQueryDto({}).isValid).toBe(false);
     expect(new SightingSearchQueryDto({ bib: '  ' }).isValid).toBe(false);
     expect(new SightingSearchQueryDto({ tag: 'finisher' }).isValid).toBe(true);
+    expect(new SightingSearchQueryDto({ video: 'GX021737.MP4' }).isValid).toBe(true);
   });
 });

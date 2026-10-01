@@ -3,11 +3,14 @@
 import {
   PointerEvent,
   useEffect,
+  useLayoutEffect,
+  useMemo,
   useRef,
   useState
 } from 'react';
 
 import {
+  ChevronDownIcon,
   PauseIcon,
   PlayIcon,
   RotateCcwIcon,
@@ -23,9 +26,21 @@ import {
   Card
 } from '@/components/ui/card';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
+import {
   cn
 } from '@/lib/utils';
 
+import {
+  PlaybackRates
+} from '@basekm/@shared/constants';
 import {
   formatClockTime
 } from '@basekm/@shared/utils/formatTime';
@@ -46,13 +61,8 @@ type CamerasTimelineProps = {
   playbackRate: number;
 };
 
-type HoverTip = {
-  left: number;
-  text: string;
-};
-
-const PlaybackRates = [0.5, 1, 2, 4];
-const LaneLabelWidth = '7rem';
+const TickSteps = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600];
+const MinimumTickSpacingPx = 90;
 
 export const CamerasTimeline = ({
   controller,
@@ -64,12 +74,44 @@ export const CamerasTimeline = ({
 }: CamerasTimelineProps) => {
   const trackRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
-  const [hoverTip, setHoverTip] = useState<HoverTip | null>(null);
   const isDraggingRef = useRef(false);
   const wasPlayingRef = useRef(false);
+  const [trackWidth, setTrackWidth] = useState(0);
 
   const span = range ? Math.max(range.to - range.from, 1) : 1;
   const percentOf = (time: number) => (range ? ((time - range.from) / span) * 100 : 0);
+
+  const ticks = useMemo(() => {
+    if (!range || !trackWidth) {
+      return [];
+    }
+
+    const pixelsPerSecond = trackWidth / span;
+    const step = TickSteps.find((candidate) => candidate * pixelsPerSecond >= MinimumTickSpacingPx) ?? TickSteps[TickSteps.length - 1];
+    const first = Math.ceil(range.from / step) * step;
+    const count = Math.max(0, Math.floor((range.to - first) / step) + 1);
+
+    return Array.from({
+      length: count,
+    }, (_, index) => first + index * step);
+  }, [range, span, trackWidth]);
+
+  useLayoutEffect(() => {
+    const track = trackRef.current;
+    if (!track) {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => {
+      setTrackWidth(track.clientWidth);
+    });
+    observer.observe(track);
+    setTrackWidth(track.clientWidth);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
 
   useEffect(() => {
     let frameId = 0;
@@ -95,16 +137,8 @@ export const CamerasTimeline = ({
     return (range?.from ?? 0) + fraction * span;
   };
 
-  const showHoverTip = (event: PointerEvent<HTMLDivElement>, time: number) => {
-    const bounds = event.currentTarget.getBoundingClientRect();
-    setHoverTip({
-      left: Math.min(Math.max(event.clientX - bounds.left, 40), bounds.width - 40),
-      text: formatClockTime(time),
-    });
-  };
-
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (!range) {
+    if (!range || event.button !== 0) {
       return;
     }
 
@@ -114,21 +148,12 @@ export const CamerasTimeline = ({
     if (controller.isPlaying) {
       controller.pause();
     }
-
-    const time = timeAtPointer(event);
-    showHoverTip(event, time);
-    controller.seekTo(time);
+    controller.seekTo(timeAtPointer(event));
   };
 
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
-    if (!range) {
-      return;
-    }
-
-    const time = timeAtPointer(event);
-    showHoverTip(event, time);
     if (isDraggingRef.current) {
-      controller.seekTo(time);
+      controller.seekTo(timeAtPointer(event));
     }
   };
 
@@ -146,176 +171,189 @@ export const CamerasTimeline = ({
   const hasRange = range !== null;
 
   return (
-    <Card className="gap-3 p-3 sm:p-4">
-      <div className="flex flex-wrap items-center gap-2">
+    <Card className="gap-0 py-0">
+      <div className="flex flex-wrap items-center gap-2 border-b px-4 py-2.5">
+        <h2 className="mr-1 text-sm font-bold">Timeline</h2>
+
         <Button
-          size="icon"
-          className="rounded-full"
+          variant="outline"
+          size="icon-sm"
           disabled={!hasRange}
           aria-label={isPlaying ? 'Pause every camera' : 'Play every camera'}
+          title="Space"
           onClick={() => controller.togglePlay()}
         >
           {isPlaying ? <PauseIcon className="fill-current" /> : <PlayIcon className="fill-current" />}
         </Button>
 
-        <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="icon-sm"
-            disabled={!hasRange}
-            aria-label="Back 5 seconds"
-            title="Back 5 seconds (←)"
-            onClick={() => controller.step(-5)}
-          >
-            <RotateCcwIcon />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon-sm"
-            disabled={!hasRange}
-            aria-label="Back a tenth of a second"
-            title="Back 0.1 s (,)"
-            onClick={() => controller.step(-0.1)}
-          >
-            <StepBackIcon />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon-sm"
-            disabled={!hasRange}
-            aria-label="Forward a tenth of a second"
-            title="Forward 0.1 s (.)"
-            onClick={() => controller.step(0.1)}
-          >
-            <StepForwardIcon />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon-sm"
-            disabled={!hasRange}
-            aria-label="Forward 5 seconds"
-            title="Forward 5 seconds (→)"
-            onClick={() => controller.step(5)}
-          >
-            <RotateCwIcon />
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={!hasRange}
+          title="Back 5 s (←)"
+          onClick={() => controller.step(-5)}
+        >
+          <RotateCcwIcon data-icon="inline-start" />
+          5s
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={!hasRange}
+          title="Forward 5 s (→)"
+          onClick={() => controller.step(5)}
+        >
+          5s
+          <RotateCwIcon data-icon="inline-end" />
+        </Button>
+        <Button
+          variant="outline"
+          size="icon-sm"
+          disabled={!hasRange}
+          aria-label="Back 0.1 s"
+          title="Back 0.1 s (,)"
+          onClick={() => controller.step(-0.1)}
+        >
+          <StepBackIcon />
+        </Button>
+        <Button
+          variant="outline"
+          size="icon-sm"
+          disabled={!hasRange}
+          aria-label="Forward 0.1 s"
+          title="Forward 0.1 s (.)"
+          onClick={() => controller.step(0.1)}
+        >
+          <StepForwardIcon />
+        </Button>
 
-        <div className="flex items-center rounded-md border p-0.5">
-          {PlaybackRates.map((rate) => (
-            <button
-              key={rate}
-              type="button"
-              className={cn(
-                'rounded px-2 py-1 text-xs font-bold tabular-nums text-muted-foreground hover:text-foreground',
-                playbackRate === rate && 'bg-muted text-foreground',
-              )}
-              onClick={() => controller.setPlaybackRate(rate)}
-            >
-              {rate}×
-            </button>
-          ))}
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={(
+              <Button
+                variant="outline"
+                size="sm"
+                className="tabular-nums"
+              />
+            )}
+          >
+            {playbackRate}×
+            <ChevronDownIcon data-icon="inline-end" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-40">
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>Playback speed</DropdownMenuLabel>
+              <DropdownMenuRadioGroup
+                value={playbackRate}
+                onValueChange={(rate: number) => controller.setPlaybackRate(rate)}
+              >
+                {PlaybackRates.map((rate) => (
+                  <DropdownMenuRadioItem
+                    key={rate}
+                    value={rate}
+                    className="tabular-nums"
+                  >
+                    {rate}×
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
-        <div className="ml-auto text-right">
-          <div className="text-xs font-semibold text-muted-foreground">Race clock</div>
-          <div className="text-xl font-extrabold tabular-nums">{hasRange ? formatClockTime(raceTime) : '—'}</div>
+        <div className="ml-auto flex items-baseline gap-2">
+          <span className="text-xs font-semibold text-muted-foreground">Race clock</span>
+          <span className="text-sm font-extrabold tabular-nums">{hasRange ? formatClockTime(raceTime) : '—'}</span>
         </div>
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        {cameras.map((camera) => {
-          const coverage = coverageOf(camera);
-
-          return (
+      <div
+        ref={trackRef}
+        className={cn('relative touch-none select-none', hasRange && 'cursor-pointer')}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+      >
+        <div className="relative h-7 border-b bg-muted/40">
+          {ticks.map((tick) => (
             <div
-              key={camera.name}
-              className="grid items-center gap-2"
+              key={tick}
+              className="absolute inset-y-0 border-l border-border"
               style={{
-                gridTemplateColumns: `${LaneLabelWidth} minmax(0, 1fr)`,
+                left: `${percentOf(tick)}%`,
               }}
             >
-              <span
-                title={camera.name}
-                className="truncate text-xs font-semibold text-muted-foreground"
-              >
-                {camera.name}
+              <span className="absolute top-1.5 left-1.5 text-xs whitespace-nowrap text-muted-foreground tabular-nums">
+                {formatClockTime(tick, false)}
               </span>
-              <div className="relative h-4 rounded bg-muted">
+            </div>
+          ))}
+          {!hasRange && (
+            <span className="absolute inset-0 flex items-center px-3 text-xs text-muted-foreground">
+              Set the race clock on a camera to see the race here
+            </span>
+          )}
+        </div>
+
+        <div className="relative flex flex-col gap-1 py-1.5">
+          {ticks.map((tick) => (
+            <div
+              key={tick}
+              className="absolute inset-y-0 border-l border-border/60"
+              style={{
+                left: `${percentOf(tick)}%`,
+              }}
+            />
+          ))}
+
+          {cameras.map((camera) => {
+            const coverage = coverageOf(camera);
+            const coverageText = coverage && `${camera.name} · ${formatClockTime(coverage.from, false)}–${formatClockTime(coverage.to, false)}`;
+            const missingClockText = `${camera.name} · race clock not set`;
+            const loadingText = `${camera.name} · loading…`;
+            const isMissingClock = camera.clockOffset === null;
+            const label = coverageText || (isMissingClock && missingClockText) || loadingText;
+
+            return (
+              <div
+                key={camera.name}
+                className="relative h-6"
+              >
                 {coverage && range && (
                   <div
-                    className="absolute inset-y-0.5 rounded-sm bg-sky-500/70"
+                    title={label}
+                    className="absolute inset-y-0 overflow-hidden rounded-sm border-l-2 border-background bg-blue-500/15 px-2 py-1 text-xs font-semibold whitespace-nowrap text-foreground italic"
                     style={{
                       left: `${percentOf(coverage.from)}%`,
                       width: `${Math.max(percentOf(coverage.to) - percentOf(coverage.from), 0.5)}%`,
                     }}
-                  />
+                  >
+                    {camera.name}
+                  </div>
                 )}
                 {!coverage && (
-                  <span className="absolute inset-0 flex items-center px-2 text-[11px] text-muted-foreground">
-                    {camera.clockOffset === null ? 'Not linked yet' : 'Loading…'}
-                  </span>
+                  <div
+                    title={label}
+                    className="absolute inset-0 overflow-hidden rounded-sm bg-[repeating-linear-gradient(45deg,var(--muted)_0_6px,transparent_6px_12px)] px-2 py-1 text-xs font-semibold whitespace-nowrap text-muted-foreground italic"
+                  >
+                    {label}
+                  </div>
                 )}
               </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <div
-        className="grid items-center gap-2"
-        style={{
-          gridTemplateColumns: `${LaneLabelWidth} minmax(0, 1fr)`,
-        }}
-      >
-        <span className="text-xs font-semibold text-muted-foreground">Scrub all</span>
-        <div
-          ref={trackRef}
-          className={cn('relative h-6 touch-none', hasRange ? 'cursor-pointer' : 'opacity-50')}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
-          onPointerLeave={() => {
-            if (!isDraggingRef.current) {
-              setHoverTip(null);
-            }
-          }}
-        >
-          <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-muted" />
-          {hasRange && (
-            <div
-              ref={playheadRef}
-              className="pointer-events-none absolute top-1/2 -mt-2 -ml-2 size-4 rounded-full border-2 border-white bg-red-500 shadow-sm"
-            />
-          )}
-          {hoverTip && (
-            <div
-              className="pointer-events-none absolute bottom-7 -translate-x-1/2 rounded-md bg-neutral-950/90 px-2 py-1 text-xs font-semibold whitespace-nowrap text-white tabular-nums"
-              style={{
-                left: hoverTip.left,
-              }}
-            >
-              {hoverTip.text}
-            </div>
-          )}
+            );
+          })}
         </div>
-      </div>
 
-      {range && (
-        <div
-          className="grid gap-2 text-xs text-muted-foreground tabular-nums"
-          style={{
-            gridTemplateColumns: `${LaneLabelWidth} minmax(0, 1fr)`,
-          }}
-        >
-          <span />
-          <div className="flex justify-between">
-            <span>{formatClockTime(range.from, false)}</span>
-            <span>{formatClockTime(range.to, false)}</span>
+        {hasRange && (
+          <div
+            ref={playheadRef}
+            className="pointer-events-none absolute inset-y-0 w-0.5 -translate-x-1/2 bg-red-500"
+          >
+            <div className="absolute -top-0.5 -left-1 size-2.5 rounded-full bg-red-500" />
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </Card>
   );
 };

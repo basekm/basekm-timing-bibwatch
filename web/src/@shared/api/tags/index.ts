@@ -4,3 +4,6 @@ export {
 export {
   TagsMutations
 } from './TagsMutations';
+export {
+  TagsQueries
+} from './TagsQueries';

@@ -1,4 +1,5 @@
 import {
+  useQueries,
   useQuery,
   UseQueryOptions
 } from '@tanstack/react-query';
@@ -19,6 +20,11 @@ import {
   SightingsApi
 } from './SightingsApi';
 
+const resultsOfEachVideo = (queries: { data?: SightingSearchResultDto[]; error: Error | null }[]) => ({
+  resultsByVideo: queries.map((query) => query.data ?? []),
+  errorMessage: queries.find((query) => query.error)?.error?.message ?? null,
+});
+
 export const SightingsQueries = {
   useSearch: (
     data: PayloadOnly<SightingSearchQueryDto>,
@@ -34,6 +40,29 @@ export const SightingsQueries = {
 
     return {
       sightingsSearchQuery,
+    };
+  },
+
+  useGetByVideos: (
+    videos: string[],
+    options?: Omit<UseQueryOptions<SightingSearchResultDto[]>, 'queryKey' | 'queryFn'>,
+  ) => {
+    const sightingsByVideo = useQueries({
+      combine: resultsOfEachVideo,
+      queries: videos.map((video) => ({
+        queryKey: ApiQueryKeys.Sightings.search({
+          video,
+        }),
+        queryFn: () => SightingsApi.search({
+          video,
+        }),
+        staleTime: 0,
+        ...options,
+      })),
+    });
+
+    return {
+      sightingsByVideo,
     };
   },
 };

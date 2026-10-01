@@ -25,10 +25,6 @@ import {
   setFinishLine
 } from '@basekm/@shared/utils/cameraSegments';
 import {
-  decideSightings,
-  sortSightingsByTime
-} from '@basekm/@shared/utils/decideSightings';
-import {
   downloadFile,
   videoStem
 } from '@basekm/@shared/utils/downloadFile';
@@ -44,12 +40,13 @@ import {
   addManualRead,
   findSightingOfRead,
   manualReadsOf,
-  markManualSightings,
-  removeManualSighting,
-  withManualReads
+  removeManualSighting
 } from '@basekm/@shared/utils/manualReads';
 import {
-  currentSightingLabel,
+  scannedRunnersOf,
+  toDetections
+} from '@basekm/@shared/utils/scannedRunners';
+import {
   sightingKey,
   toggleSightingTag
 } from '@basekm/@shared/utils/sightingTags';
@@ -102,24 +99,6 @@ export type FramePoint = {
 const IsPeopleFirstByDefault = true;
 
 const LegacyClockStorageKey = (videoName: string) => `bibwatch.clock.${videoName}`;
-
-const toDetections = (json: DetectionsDto | SegmentsFileDto): DetectionsDto => {
-  if ('frames' in json && Array.isArray(json.frames)) {
-    return {
-      ...json,
-      frames: [...json.frames].sort((a, b) => a.t - b.t),
-    };
-  }
-
-  return {
-    video: json.video,
-    duration: json.duration,
-    segments: json.segments ?? [],
-    frames: [],
-    sightings: [],
-    clock: null,
-  };
-};
 
 const readLegacyClock = (videoName: string) => {
   try {
@@ -248,43 +227,18 @@ export const useViewerSession = ({
 
   const manualReads = useMemo(() => manualReadsOf(tags), [tags]);
 
-  const scanWithManualReads = useMemo(() => withManualReads({
-    frames: detections?.frames ?? [],
-    coarseHits: detections?.coarseHits,
+  const scannedRunners = useMemo(() => scannedRunnersOf({
+    detections,
+    segments,
     manualReads,
-  }), [detections, manualReads]);
+  }), [detections, segments, manualReads]);
 
-  const frames = scanWithManualReads.frames;
-
-  const targets = useMemo(() => {
-    if (detections?.targets) {
-      return new Set(detections.targets);
-    }
-
-    return new Set((detections?.sightings ?? []).filter((sighting) => sighting.target).map((sighting) => sighting.bib));
-  }, [detections]);
-
-  const sightings = useMemo(() => {
-    if (!detections) {
-      return [];
-    }
-
-    if (detections.coarseHits && scanWithManualReads.coarseHits) {
-      const decided = decideSightings({
-        coarseHits: scanWithManualReads.coarseHits,
-        segments,
-        frames,
-        targets,
-        settings: detections.settings,
-      });
-      return markManualSightings({
-        sightings: decided,
-        manualReads,
-      });
-    }
-
-    return sortSightingsByTime(detections.sightings ?? []);
-  }, [detections, segments, frames, targets, scanWithManualReads, manualReads]);
+  const {
+    frames,
+    targets,
+    sightings,
+    crossedBibs
+  } = scannedRunners;
 
   if (pendingRead) {
     const added = findSightingOfRead({
@@ -296,11 +250,6 @@ export const useViewerSession = ({
     }
     setPendingRead(null);
   }
-
-  const crossedBibs = useMemo(() => {
-    const crossed = sightings.filter((sighting) => currentSightingLabel(sighting) === SightingLabel.Crossed);
-    return new Set(crossed.map((sighting) => sighting.bib));
-  }, [sightings]);
 
   const needsScanCount = useMemo(() => sightings.filter((sighting) => sighting.label === SightingLabel.NeedsScan).length, [sightings]);
 
@@ -526,10 +475,8 @@ export const useViewerSession = ({
 
   const restoreSelectedVideo = useCallback(async () => {
     const query = new URLSearchParams(window.location.search);
-    // Opened from "All cameras": that camera, with its scan, instead of the last video.
     const cameraVideo = query.get('camera');
     if (cameraVideo) {
-      // Once only: a reload or another video afterwards shouldn't bring it back.
       window.history.replaceState(null, '', window.location.pathname);
     }
     if (cameraVideo && !videoSource && mediaOverview?.videos.includes(cameraVideo)) {

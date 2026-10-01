@@ -37,6 +37,7 @@ type RunnerListItemProps = {
   isUnregistered: boolean;
   myTags: string[];
   clockOffset: number | null;
+  sourceText?: string;
   onSelect: (sighting: SightingDto) => void;
 };
 
@@ -70,6 +71,7 @@ export const RunnerListItem = memo(({
   isUnregistered,
   myTags,
   clockOffset,
+  sourceText,
   onSelect,
 }: RunnerListItemProps) => {
   const label = currentSightingLabel(sighting);
@@ -109,6 +111,7 @@ export const RunnerListItem = memo(({
         <span className="truncate text-xs text-muted-foreground">
           {detailTextOf(sighting)}
           {sighting.manual && ' · added by hand'}
+          {sourceText && ` · ${sourceText}`}
         </span>
 
         {(sighting.target || isUnregistered || myTags.length > 0) && (

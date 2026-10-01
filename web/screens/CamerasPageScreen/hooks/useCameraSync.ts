@@ -8,14 +8,21 @@ import {
   CameraSyncController
 } from '../utils/CameraSyncController';
 
+type CameraSyncParams = {
+  controller: CameraSyncController;
+  resolutionSeconds: number;
+};
+
 export type CameraSyncSnapshot = {
   raceTime: number;
   isPlaying: boolean;
   playbackRate: number;
 };
 
-/** The race clock as React state, rounded to `resolutionSeconds` so a playing clock doesn't re-render every frame. */
-export const useCameraSync = (controller: CameraSyncController, resolutionSeconds: number) => {
+export const useCameraSync = ({
+  controller,
+  resolutionSeconds,
+}: CameraSyncParams) => {
   const snapshotRef = useRef<CameraSyncSnapshot>({
     raceTime: 0,
     isPlaying: false,
@@ -23,16 +30,15 @@ export const useCameraSync = (controller: CameraSyncController, resolutionSecond
   });
 
   const getSnapshot = useCallback(() => {
-    const raceTime = Math.floor(controller.raceTime / resolutionSeconds) * resolutionSeconds;
+    const roundedRaceTime = Math.floor(controller.raceTime / resolutionSeconds) * resolutionSeconds;
     const previous = snapshotRef.current;
-
-    if (
-      previous.raceTime !== raceTime
+    const hasChanged = previous.raceTime !== roundedRaceTime
       || previous.isPlaying !== controller.isPlaying
-      || previous.playbackRate !== controller.playbackRate
-    ) {
+      || previous.playbackRate !== controller.playbackRate;
+
+    if (hasChanged) {
       snapshotRef.current = {
-        raceTime,
+        raceTime: roundedRaceTime,
         isPlaying: controller.isPlaying,
         playbackRate: controller.playbackRate,
       };

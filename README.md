@@ -79,6 +79,8 @@ The viewer is a Next.js app in `web/` (shadcn/ui + Tailwind, laid out and themed
 - **Timeline** (under the video): every runner as a marker, camera positions underneath;
   Ctrl + scroll (or the slider) zooms, **Fit all** zooms out.
 - **Mark and annotate**: previous / next runner, **Mark finish line**, **Split camera position here**.
+- **Boxes** (header): each camera draws its own scan's boxes and bib numbers, the same as the
+  viewer (finish line, finished in green, watchlist in red); switch them off for a clean view.
 - **Runners spotted** (right): All / Finished / Watchlist / Not yet finished, search, movement,
   **CSV**, and **This video / All videos**. Select a runner to tag it.
 - **⋯ More**: open files, bib numbers, race clock, split, download segments.json,
@@ -96,10 +98,17 @@ one as **Set…** in the viewer), saved per video:
   **Line up** redoes it for a camera that's already linked.
 - The lanes under the videos show what part of the race each camera recorded; a camera that
   wasn't recording at that moment shows when it starts or ended.
+- **Runners spotted** (right): everything every camera saw, merged in race-clock order (each row
+  says which camera; the ones at the current moment are highlighted). Search a bib to filter;
+  click a row to move every camera there. It's each video's own scan, as saved, refreshed
+  every few seconds, so a scan running in the viewer shows up as it goes. Cameras without a race
+  clock aren't included. API: `GET /api/sightings?video=GX021737.MP4`.
 - Click a video to open it in the viewer at that moment (scans, runners and tags as usual);
   **All cameras** brings you back to the same moment.
 
-Keys: Space play / pause, ← → 5 s, `,` `.` 0.1 s. Pick the videos in the cameras menu (top right).
+Keys: Space play / pause, ← → 5 s, `,` `.` 0.1 s. Pick the videos in the **Cameras** menu (top);
+the videos fill the screen, in the grid that shows them largest for how many there are
+(**Auto**), or pick 1–4 **columns** or **rows** in the layout menu next to it (remembered).
 
 ## Bib numbers (per event)
 

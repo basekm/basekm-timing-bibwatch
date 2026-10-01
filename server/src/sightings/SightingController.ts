@@ -17,7 +17,7 @@ export class SightingController {
   @Get()
   async search(@Query() query: SightingSearchQueryDto) {
     if (!query.isValid) {
-      throw new BadRequestException({ error: 'give a bib or a tag to search for' });
+      throw new BadRequestException({ error: 'give a bib, a tag or a video to search for' });
     }
     return { sightings: await this.sightingService.search(query) };
   }
