@@ -2,11 +2,11 @@ import 'reflect-metadata';
 
 import { EventSettingsRequestDto } from '../@shared/dto/EventSettingsRequestDto';
 import { SightingSearchQueryDto } from '../@shared/dto/SightingSearchQueryDto';
-import { ConfigService } from '../config/ConfigService';
+import { FolderService } from '../folder/FolderService';
 
 import { EventService } from './EventService';
 
-const eventService = new EventService({} as any, { MediaFolder: '/videos/race' } as ConfigService);
+const eventService = new EventService({} as any, { requireFolder: () => '/videos/race' } as FolderService);
 
 describe('EventService.bibArgsOf', () => {
   it('adds no --digits for the classic 4 digits, so earlier scans stay reusable', () => {

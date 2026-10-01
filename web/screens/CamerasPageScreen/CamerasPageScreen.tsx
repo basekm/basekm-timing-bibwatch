@@ -536,13 +536,15 @@ export const CamerasPageScreen = () => {
         <div className="flex min-w-0 flex-col gap-3 lg:min-h-0">
           {isServerDown && (
             <Card className="p-6 text-sm text-muted-foreground">
-            The bibwatch server isn’t reachable, so the videos in the media folder can’t be listed.
+            The bibwatch server isn’t reachable, so the videos in the folder can’t be listed.
             </Card>
           )}
 
           {isEmpty && (
             <Card className="p-6 text-sm text-muted-foreground">
-            Pick the videos to watch together from the Cameras menu at the top.
+              {overview?.folder
+                ? 'Pick the videos to watch together from the Cameras menu at the top.'
+                : 'No folder is open yet: open the folder with the race videos in the Viewer first.'}
             </Card>
           )}
 

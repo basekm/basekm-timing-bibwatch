@@ -8,6 +8,7 @@ import {
   AlertCircleIcon,
   CheckIcon,
   ChevronDownIcon,
+  FolderOpenIcon,
   LayoutGridIcon,
   Loader2Icon
 } from 'lucide-react';
@@ -40,6 +41,9 @@ export type ViewerHeaderVideo = {
 };
 
 export type ViewerHeaderProps = {
+  /** The open folder's name; null before one is opened. */
+  folderName: string | null;
+  isFolderButtonShown: boolean;
   videos: ViewerHeaderVideo[];
   selectedVideoName: string | null;
   saveState: SaveState;
@@ -50,6 +54,7 @@ export type ViewerHeaderProps = {
   isScanButtonShown: boolean;
   isScanButtonDisabled: boolean;
   isScanning: boolean;
+  onOpenFolderClick: () => void;
   onSelectVideo: (name: string) => void;
   onScanClick: () => void;
   actions: ReactNode;
@@ -96,6 +101,8 @@ const SaveStateIndicator = ({
 };
 
 export const ViewerHeader = ({
+  folderName,
+  isFolderButtonShown,
   videos,
   selectedVideoName,
   saveState,
@@ -106,6 +113,7 @@ export const ViewerHeader = ({
   isScanButtonShown,
   isScanButtonDisabled,
   isScanning,
+  onOpenFolderClick,
   onSelectVideo,
   onScanClick,
   actions,
@@ -169,6 +177,19 @@ export const ViewerHeader = ({
       )}
     >
       <div className="flex min-w-0 items-center gap-2 text-xs font-semibold">
+        {isFolderButtonShown && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="max-w-48 shrink-0 font-bold"
+            title={folderName ? 'Open another folder' : 'Open the folder with the race videos'}
+            onClick={onOpenFolderClick}
+          >
+            <FolderOpenIcon data-icon="inline-start" />
+            <span className="truncate">{folderName ?? 'Open folder…'}</span>
+          </Button>
+        )}
+
         <span className="hidden text-muted-foreground sm:inline">Video:</span>
 
         {hasVideoList && (
@@ -187,7 +208,7 @@ export const ViewerHeader = ({
             </DropdownMenuTrigger>
             <DropdownMenuContent className="max-h-96 w-80">
               <DropdownMenuGroup>
-                <DropdownMenuLabel>Videos in the media folder</DropdownMenuLabel>
+                <DropdownMenuLabel>Videos in {folderName ?? 'the folder'}</DropdownMenuLabel>
                 <DropdownMenuRadioGroup
                   value={selectedVideoName ?? ''}
                   onValueChange={(value) => onSelectVideo(String(value))}

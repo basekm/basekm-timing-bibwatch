@@ -8,7 +8,7 @@ import { Repository } from 'typeorm';
 
 import { EventSettingsRequestDto } from '../@shared/dto/EventSettingsRequestDto';
 import { EventSettingsEntity } from '../@shared/entities/EventSettingsEntity';
-import { ConfigService } from '../config/ConfigService';
+import { FolderService } from '../folder/FolderService';
 
 const ROW = 1;
 
@@ -20,11 +20,11 @@ export class EventService {
   constructor(
     @InjectRepository(EventSettingsEntity)
     private readonly eventSettingsRepository: Repository<EventSettingsEntity>,
-    private readonly configService: ConfigService,
+    private readonly folderService: FolderService,
   ) {}
 
   private get registeredFile() {
-    return path.join(this.configService.MediaFolder, 'registered.txt');
+    return path.join(this.folderService.requireFolder(), 'registered.txt');
   }
 
   async getSettings() {

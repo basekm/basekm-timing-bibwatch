@@ -28,6 +28,12 @@ class ApiMutationKeysEvent {
   }
 }
 
+class ApiMutationKeysFolders {
+  static open() {
+    return ['folders', 'open'];
+  }
+}
+
 class ApiMutationKeysSightings {
   static save() {
     return ['sightings', 'save'];
@@ -51,6 +57,10 @@ export class ApiMutationKeys {
 
   static get Event() {
     return ApiMutationKeysEvent;
+  }
+
+  static get Folders() {
+    return ApiMutationKeysFolders;
   }
 
   static get Sightings() {

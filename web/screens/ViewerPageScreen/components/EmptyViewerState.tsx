@@ -2,6 +2,7 @@
 
 import {
   FilmIcon,
+  FolderOpenIcon,
   UploadIcon
 } from 'lucide-react';
 
@@ -18,32 +19,80 @@ import {
 
 type EmptyViewerStateProps = {
   videos: ViewerHeaderVideo[];
-  isServerAvailable: boolean;
+  /** The open folder's name: null when the server is up but no folder is open yet. */
+  folderName: string | null;
+  isServerUp: boolean;
   onSelectVideo: (name: string) => void;
+  onOpenFolder: () => void;
   onOpenVideoFile: () => void;
+};
+
+const textOf = ({
+  folderName,
+  isServerUp,
+  hasVideos,
+}: {
+  folderName: string | null;
+  isServerUp: boolean;
+  hasVideos: boolean;
+}) => {
+  if (!isServerUp) {
+    return {
+      title: 'Open a race video',
+      description: 'Drop a video anywhere on this page. It stays on this computer.',
+    };
+  }
+
+  if (!folderName) {
+    return {
+      title: 'Open a folder',
+      description: 'Pick the folder with the race videos. Scans, runners and tags are saved in it.',
+    };
+  }
+
+  if (!hasVideos) {
+    return {
+      title: `No videos in “${folderName}”`,
+      description: 'Add .mp4 or .mov files to it (symlinks are fine), or open another folder.',
+    };
+  }
+
+  return {
+    title: 'Pick a video',
+    description: `From “${folderName}”, or drop a video anywhere on this page.`,
+  };
 };
 
 export const EmptyViewerState = ({
   videos,
-  isServerAvailable,
+  folderName,
+  isServerUp,
   onSelectVideo,
+  onOpenFolder,
   onOpenVideoFile,
 }: EmptyViewerStateProps) => {
+  const text = textOf({
+    folderName,
+    isServerUp,
+    hasVideos: videos.length > 0,
+  });
+  const isFolderFirst = isServerUp && !folderName;
+
   return (
     <Card className="flex aspect-video items-center justify-center border-2 border-dashed bg-card/60 p-6 shadow-none ring-0">
       <div className="flex w-full max-w-lg flex-col items-center gap-5 text-center">
         <div className="flex size-12 items-center justify-center rounded-full bg-muted">
-          <UploadIcon className="size-5 text-muted-foreground" />
+          {isServerUp
+            ? <FolderOpenIcon className="size-5 text-muted-foreground" />
+            : <UploadIcon className="size-5 text-muted-foreground" />}
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <h2 className="text-base font-bold">Open a race video</h2>
-          <p className="text-sm text-muted-foreground">
-            Drop a video anywhere on this page. It stays on this computer.
-          </p>
+          <h2 className="text-base font-bold">{text.title}</h2>
+          <p className="text-sm text-muted-foreground">{text.description}</p>
         </div>
 
-        {isServerAvailable && videos.length > 0 && (
+        {videos.length > 0 && (
           <div className="flex max-h-56 w-full flex-col gap-1 overflow-y-auto rounded-lg border bg-background p-1 text-left">
             {videos.map((video) => (
               <button
@@ -61,6 +110,15 @@ export const EmptyViewerState = ({
         )}
 
         <div className="flex flex-wrap justify-center gap-2">
+          {isServerUp && (
+            <Button
+              variant={isFolderFirst ? 'default' : 'outline'}
+              onClick={onOpenFolder}
+            >
+              <FolderOpenIcon data-icon="inline-start" />
+              {folderName ? 'Open another folder…' : 'Open folder…'}
+            </Button>
+          )}
           <Button
             variant="outline"
             onClick={onOpenVideoFile}

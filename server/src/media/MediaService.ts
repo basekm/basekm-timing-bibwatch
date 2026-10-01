@@ -5,21 +5,20 @@ import * as path from 'path';
 
 import { isDirectory, isFile, pathExists } from '../@shared/lib/pathExists';
 import { BibwatchService } from '../bibwatch/BibwatchService';
-import { ConfigService } from '../config/ConfigService';
+import { FolderService, isVideoName } from '../folder/FolderService';
 import { VideoService } from '../videos/VideoService';
-
-const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.m4v'];
 
 @Injectable()
 export class MediaService {
   constructor(
-    private readonly configService: ConfigService,
+    private readonly folderService: FolderService,
     private readonly bibwatchService: BibwatchService,
     private readonly videoService: VideoService,
   ) {}
 
+  /** The open folder (a 409 if none is open yet). */
   get folder() {
-    return this.configService.MediaFolder;
+    return this.folderService.requireFolder();
   }
 
   /**
@@ -52,10 +51,13 @@ export class MediaService {
   /** Video files at the top of the media folder (the Library). */
   async getVideos() {
     const names = await fs.readdir(this.folder);
-    return names.filter((n) => VIDEO_EXTENSIONS.includes(path.extname(n).toLowerCase())).sort();
+    return names.filter(isVideoName).sort();
   }
 
   async getOverview() {
+    if (!this.folderService.folder) {
+      return { folder: null, videos: [], json: [], scans: {}, targets: false, scanner: await this.bibwatchService.isBuilt(), clocks: {} };
+    }
     const names = (await fs.readdir(this.folder)).sort();
     const videos = await this.getVideos();
     const videoOfStem = new Map(videos.map((video) => [videoStem(video), video]));
@@ -84,6 +86,7 @@ export class MediaService {
     }
 
     return {
+      folder: { path: this.folder, name: path.basename(this.folder) },
       videos,
       json: names.filter((n) => n.toLowerCase().endsWith('.json')),
       scans,
